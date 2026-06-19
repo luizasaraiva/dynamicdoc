@@ -1,15 +1,10 @@
--- DynamicDoc | Banco de dados + Auth
--- Cole este SQL no Supabase > SQL Editor > New query > Run
-
--- =========================
--- ARTIGOS E PROCESSOS
--- =========================
 create table if not exists public.artigos (
   id text primary key,
   title text,
   summary text,
   system text,
   department text,
+  module text default 'Geral',
   status text default 'publicado',
   tags jsonb default '[]'::jsonb,
   image text,
@@ -29,6 +24,7 @@ create table if not exists public.artigos (
 );
 
 alter table public.artigos
+add column if not exists module text default 'Geral',
 add column if not exists likes integer default 0,
 add column if not exists dislikes integer default 0,
 add column if not exists history jsonb default '[]'::jsonb,
@@ -147,26 +143,19 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
--- Limpa policies antigas para evitar erro "policy already exists"
 drop policy if exists "ler profiles" on public.profiles;
-drop policy if exists "criar proprio profile" on public.profiles;
-drop policy if exists "admin cria profiles" on public.profiles;
-drop policy if exists "editar proprio profile" on public.profiles;
-drop policy if exists "admin edita profiles" on public.profiles;
-drop policy if exists "usuarios podem ver perfis" on public.profiles;
-drop policy if exists "usuarios podem criar seu perfil" on public.profiles;
-drop policy if exists "usuarios podem atualizar seu perfil" on public.profiles;
-
 create policy "ler profiles"
 on public.profiles
 for select
 using (true);
 
+drop policy if exists "criar proprio profile" on public.profiles;
 create policy "criar proprio profile"
 on public.profiles
 for insert
 with check (auth.uid() = id);
 
+drop policy if exists "admin cria profiles" on public.profiles;
 create policy "admin cria profiles"
 on public.profiles
 for insert
@@ -178,12 +167,14 @@ with check (
   )
 );
 
+drop policy if exists "editar proprio profile" on public.profiles;
 create policy "editar proprio profile"
 on public.profiles
 for update
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
+drop policy if exists "admin edita profiles" on public.profiles;
 create policy "admin edita profiles"
 on public.profiles
 for update
@@ -202,43 +193,3 @@ with check (
   )
 );
 
--- Trigger: quando um usuário é criado no Supabase Auth, cria automaticamente o perfil
--- Isso corrige o problema de usuário existir em Authentication, mas não conseguir acessar por falta de profile.
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profiles (
-    id,
-    nome,
-    email,
-    perfil,
-    departamento,
-    empresa
-  )
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'nome', new.raw_user_meta_data->>'name', new.email),
-    new.email,
-    coalesce(new.raw_user_meta_data->>'perfil', 'usuario'),
-    coalesce(new.raw_user_meta_data->>'departamento', 'Sem departamento'),
-    coalesce(new.raw_user_meta_data->>'empresa', '')
-  )
-  on conflict (id) do update set
-    nome = excluded.nome,
-    email = excluded.email,
-    perfil = excluded.perfil,
-    departamento = excluded.departamento,
-    empresa = excluded.empresa;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute procedure public.handle_new_user();
