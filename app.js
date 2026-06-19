@@ -232,6 +232,12 @@ async function createUserSupabase({ nome, email, password, perfil, departamento,
     return null;
   }
 
+  if (!email || !password) {
+    alert('Informe e-mail e senha temporária.');
+    return null;
+  }
+
+  // Cliente temporário para criar outro usuário sem derrubar a sessão do admin logado.
   const tempClient = window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey, {
     auth: {
       persistSession: false,
@@ -249,13 +255,13 @@ async function createUserSupabase({ nome, email, password, perfil, departamento,
   });
 
   if (error) {
-    alert('Erro ao cadastrar usuário no Auth: ' + error.message);
+    alert('Erro ao cadastrar usuário no Supabase Auth: ' + error.message);
     return null;
   }
 
   const userId = data?.user?.id;
   if (!userId) {
-    alert('Cadastro iniciado. Verifique o e-mail para confirmar o acesso.');
+    alert('Cadastro iniciado. Se a confirmação de e-mail estiver ativa no Supabase, confirme o e-mail antes de acessar.');
     return null;
   }
 
@@ -268,13 +274,14 @@ async function createUserSupabase({ nome, email, password, perfil, departamento,
     empresa
   };
 
+  // O trigger do banco cria o profile automaticamente.
+  // Este upsert é um reforço caso o trigger ainda não tenha sido criado no Supabase.
   const { error: profileError } = await supabaseDb
     .from('profiles')
     .upsert(profilePayload, { onConflict: 'id' });
 
   if (profileError) {
-    alert('Usuário criado no Auth, mas houve erro ao salvar o perfil: ' + profileError.message);
-    return null;
+    console.warn('Profile não foi salvo pelo cliente, aguardando trigger do banco:', profileError.message);
   }
 
   return { id: userId, ...profilePayload };
