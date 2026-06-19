@@ -1283,5 +1283,3 @@ async function startDynamicDoc() {
 }
 
 startDynamicDoc();
-
-
