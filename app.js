@@ -11,6 +11,13 @@ const initialData = {
     { id: 'eventos', name: 'Eventos', description: 'Fluxos e materiais de apoio para eventos e grupos.' },
     { id: 'operacao', name: 'Operação', description: 'Procedimentos operacionais, execução e acompanhamento.' }
   ],
+  processModules: [
+    { id: crypto.randomUUID(), system: 'argo', name: 'Cadastros' },
+    { id: crypto.randomUUID(), system: 'argo', name: 'Aprovações' },
+    { id: crypto.randomUUID(), system: 'reserve', name: 'Cadastros' },
+    { id: crypto.randomUUID(), system: 'wts', name: 'Operação' },
+    { id: crypto.randomUUID(), system: 'reserva-facil', name: 'Pesquisa' }
+  ],
   clients: [
     { id: crypto.randomUUID(), name: 'Mariana Costa', email: 'mariana.costa@empresa.com', company: 'Empresa Modelo', role: 'usuário comum' },
     { id: crypto.randomUUID(), name: 'Rafael Lima', email: 'rafael.lima@cliente.com', company: 'Cliente Exemplo', role: 'usuário comum' }
@@ -73,6 +80,7 @@ const initialData = {
 let db = JSON.parse(localStorage.getItem('dynamicdoc-db')) || initialData;
 db.clients = db.clients || initialData.clients;
 db.agencyUsers = db.agencyUsers || initialData.agencyUsers;
+db.processModules = db.processModules || initialData.processModules;
 db.articles = (db.articles || []).map(a => ({ kind: a.kind || 'article', comments: a.comments || [], likes: 0, dislikes: 0, version: '1.0', homologation: 'homologado', history: [], module: a.module || a.modulo || 'Geral', ...a }));
 db.favorites = db.favorites || [];
 db.portalBanner = db.portalBanner || '';
@@ -90,6 +98,7 @@ const supabaseDb = supabaseReady ? window.supabase.createClient(supabaseSettings
 let selectedArticleId = null;
 let editorReturnPage = 'articles';
 let selectedProcessSystem = '';
+let selectedProcessModule = '';
 
 const $ = (id) => document.getElementById(id);
 const saveDb = () => localStorage.setItem('dynamicdoc-db', JSON.stringify(db));
@@ -97,15 +106,17 @@ const saveDb = () => localStorage.setItem('dynamicdoc-db', JSON.stringify(db));
 async function loadSupabaseData() {
   if (!supabaseDb) return;
 
-  const [articlesRes, clientsRes, agencyRes] = await Promise.all([
+  const [articlesRes, clientsRes, agencyRes, modulesRes] = await Promise.all([
     supabaseDb.from('artigos').select('*').order('updatedAt', { ascending: false }),
     supabaseDb.from('clientes').select('*').order('name', { ascending: true }),
-    supabaseDb.from('usuarios_agencia').select('*').order('name', { ascending: true })
+    supabaseDb.from('usuarios_agencia').select('*').order('name', { ascending: true }),
+    supabaseDb.from('modulos_processos').select('*').order('name', { ascending: true })
   ]);
 
   if (articlesRes.error) console.warn('Erro ao carregar artigos do Supabase:', articlesRes.error.message);
   if (clientsRes.error) console.warn('Erro ao carregar clientes do Supabase:', clientsRes.error.message);
   if (agencyRes.error) console.warn('Erro ao carregar usuários agência do Supabase:', agencyRes.error.message);
+  if (modulesRes.error) console.warn('Erro ao carregar módulos de processos do Supabase:', modulesRes.error.message);
 
   if (articlesRes.data?.length) {
     db.articles = articlesRes.data.map(a => ({
@@ -118,6 +129,7 @@ async function loadSupabaseData() {
   }
   if (clientsRes.data?.length) db.clients = clientsRes.data;
   if (agencyRes.data?.length) db.agencyUsers = agencyRes.data;
+  if (modulesRes.data?.length) db.processModules = modulesRes.data;
   saveDb();
 }
 
@@ -948,59 +960,157 @@ function openArticle(id) {
   $('articleModal').classList.remove('hidden');
 }
 
+function processCountForSystem(systemId) {
+  return visibleArticles('process').filter(article => article.system === systemId).length;
+}
+
+function processModulesForSystem(systemId) {
+  const explicit = (db.processModules || []).filter(module => module.system === systemId).map(module => module.name);
+  const fromArticles = visibleArticles('process').filter(article => article.system === systemId).map(article => article.module || 'Geral');
+  return [...new Set([...explicit, ...fromArticles])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+}
+
+function processArticlesForModule(systemId, moduleName) {
+  return visibleArticles('process')
+    .filter(article => article.system === systemId && (article.module || 'Geral') === moduleName)
+    .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+}
+
+function selectProcessSystem(id) {
+  selectedProcessSystem = id;
+  selectedProcessModule = '';
+  renderProcesses();
+}
+
+function selectProcessModule(moduleName) {
+  selectedProcessModule = moduleName;
+  renderProcesses();
+}
+
+function backToProcessSystems() {
+  selectedProcessSystem = '';
+  selectedProcessModule = '';
+  renderProcesses();
+}
+
+function backToProcessModules() {
+  selectedProcessModule = '';
+  renderProcesses();
+}
+
+async function createProcessModule() {
+  if (!isAdmin()) return alert('Apenas administradores podem criar módulos.');
+  if (!selectedProcessSystem) return alert('Selecione um sistema antes de criar o módulo.');
+
+  const system = db.systems.find(item => item.id === selectedProcessSystem);
+  const name = prompt(`Nome do novo módulo para ${system?.name || 'este sistema'}:`);
+  if (!name?.trim()) return;
+
+  const cleanName = name.trim();
+  const exists = processModulesForSystem(selectedProcessSystem).some(module => module.toLowerCase() === cleanName.toLowerCase());
+  if (exists) return alert('Este módulo já existe neste sistema.');
+
+  const payload = {
+    id: crypto.randomUUID(),
+    system: selectedProcessSystem,
+    name: cleanName,
+    createdAt: new Date().toLocaleDateString('pt-BR')
+  };
+
+  db.processModules.unshift(payload);
+  saveDb();
+  await upsertSupabase('modulos_processos', payload);
+  renderProcesses();
+}
+
+function newProcessInSelectedModule() {
+  if (!selectedProcessSystem || !selectedProcessModule) {
+    newArticle('process');
+    return;
+  }
+
+  newArticle('process');
+  if ($('formSystem')) $('formSystem').value = selectedProcessSystem;
+  if ($('formModule')) $('formModule').value = selectedProcessModule;
+}
+
 function renderProcesses() {
   const board = $('processBoard');
   const list = $('processList');
   if (!board || !list) return;
 
-  const processes = visibleArticles('process');
-
-  board.innerHTML = db.systems.map(system => {
-    const systemProcesses = processes.filter(article => article.system === system.id);
-    const modules = [...new Set(systemProcesses.map(article => article.module || 'Geral'))].sort((a, b) => a.localeCompare(b));
-
-    return `
-      <article class="process-system-card">
-        <div class="process-system-header">
-          <div>
-            <span class="process-kicker">Sistema</span>
-            <h4>${system.name}</h4>
-          </div>
-          <span class="process-count">${systemProcesses.length} artigo(s)</span>
-        </div>
-
-        ${modules.length ? modules.map(moduleName => {
-          const moduleArticles = systemProcesses.filter(article => (article.module || 'Geral') === moduleName);
-          return `
-            <div class="process-module-block">
-              <button class="process-module-title" type="button">
-                <span>Módulo</span>
-                <strong>${moduleName}</strong>
-              </button>
-
-              <div class="process-module-articles">
-                ${moduleArticles.map(article => `
-                  <div class="process-article-line" onclick="openArticle('${article.id}')">
-                    <div>
-                      <strong>${article.title}</strong>
-                      <p>${article.summary}</p>
-                    </div>
-                    <div class="process-actions" onclick="event.stopPropagation()">
-                      <button class="ghost-btn" onclick="openArticle('${article.id}')">Abrir</button>
-                      ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="editArticle('${article.id}')">Editar</button>` : ''}
-                      ${isAdmin() ? `<button class="danger-btn" onclick="deleteArticle('${article.id}')">Excluir</button>` : ''}
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        }).join('') : '<p class="muted small-muted">Nenhum processo cadastrado neste sistema.</p>'}
-      </article>
+  if (!selectedProcessSystem) {
+    board.innerHTML = `
+      <div class="process-flow-heading">
+        <span class="process-step active">1. Sistemas</span>
+        <span class="process-step">2. Módulos</span>
+        <span class="process-step">3. Artigos</span>
+      </div>
+      <div class="process-system-grid">
+        ${db.systems.map(system => `
+          <button class="process-system-tile" type="button" onclick="selectProcessSystem('${system.id}')">
+            <span>Sistema</span>
+            <strong>${system.name}</strong>
+            <small>${processCountForSystem(system.id)} processo(s)</small>
+          </button>
+        `).join('')}
+      </div>
     `;
-  }).join('');
+    list.innerHTML = '';
+    return;
+  }
 
-  list.innerHTML = '';
+  const system = db.systems.find(item => item.id === selectedProcessSystem);
+  const modules = processModulesForSystem(selectedProcessSystem);
+
+  if (!selectedProcessModule) {
+    board.innerHTML = `
+      <div class="process-flow-heading">
+        <button class="ghost-btn" type="button" onclick="backToProcessSystems()">← Voltar para sistemas</button>
+        <span class="process-step done">1. ${system?.name || 'Sistema'}</span>
+        <span class="process-step active">2. Módulos</span>
+        <span class="process-step">3. Artigos</span>
+        ${isAdmin() ? `<button class="primary-btn" type="button" onclick="createProcessModule()">+ Criar módulo</button>` : ''}
+      </div>
+      <div class="process-module-grid">
+        ${modules.length ? modules.map(moduleName => `
+          <button class="process-module-tile" type="button" onclick="selectProcessModule('${moduleName.replace(/'/g, "\\'")}')">
+            <span>Módulo</span>
+            <strong>${moduleName}</strong>
+            <small>${processArticlesForModule(selectedProcessSystem, moduleName).length} artigo(s)</small>
+          </button>
+        `).join('') : `<div class="panel"><p class="muted">Nenhum módulo criado para ${system?.name || 'este sistema'}.</p>${isAdmin() ? `<button class="primary-btn" type="button" onclick="createProcessModule()">Criar primeiro módulo</button>` : ''}</div>`}
+      </div>
+    `;
+    list.innerHTML = '';
+    return;
+  }
+
+  const moduleArticles = processArticlesForModule(selectedProcessSystem, selectedProcessModule);
+  board.innerHTML = `
+    <div class="process-flow-heading">
+      <button class="ghost-btn" type="button" onclick="backToProcessModules()">← Voltar para módulos</button>
+      <span class="process-step done">1. ${system?.name || 'Sistema'}</span>
+      <span class="process-step done">2. ${selectedProcessModule}</span>
+      <span class="process-step active">3. Artigos</span>
+      ${canSeeInternalProcesses() ? `<button class="primary-btn" type="button" onclick="newProcessInSelectedModule()">+ Criar artigo neste módulo</button>` : ''}
+    </div>
+  `;
+
+  list.innerHTML = moduleArticles.length ? moduleArticles.map(article => `
+    <article class="process-article-card" onclick="openArticle('${article.id}')">
+      <div>
+        <strong>${article.title}</strong>
+        <p>${article.summary}</p>
+        <div class="meta"><span class="tag">${systemName(article.system)}</span><span class="tag">${article.module || 'Geral'}</span><span class="tag status ${article.status}">${article.status}</span></div>
+      </div>
+      <div class="process-actions" onclick="event.stopPropagation()">
+        <button class="ghost-btn" onclick="openArticle('${article.id}')">Abrir</button>
+        ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="editArticle('${article.id}')">Editar</button>` : ''}
+        ${isAdmin() ? `<button class="danger-btn" onclick="deleteArticle('${article.id}')">Excluir</button>` : ''}
+      </div>
+    </article>
+  `).join('') : `<div class="panel"><p class="muted">Nenhum artigo vinculado ao módulo ${selectedProcessModule}.</p>${canSeeInternalProcesses() ? `<button class="primary-btn" type="button" onclick="newProcessInSelectedModule()">Criar primeiro artigo</button>` : ''}</div>`;
 }
 
 function saveBanner() {
@@ -1173,4 +1283,5 @@ async function startDynamicDoc() {
 }
 
 startDynamicDoc();
+
 
