@@ -223,7 +223,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
   align-items: center;
 }
 .three-cols { grid-template-columns: 1fr 1fr 1fr auto; }
-.agency-form { grid-template-columns: 1fr 1fr 180px 190px auto; }
+.agency-form { grid-template-columns: 1fr 1fr 160px 170px 170px auto; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 16px; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; background: white; }
 th, td { text-align: left; padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
