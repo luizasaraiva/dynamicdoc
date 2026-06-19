@@ -49,36 +49,21 @@
           <button class="ghost-btn" id="loginBtn">Entrar</button>
         </div>
       </header>
-      
-<section id="loginPanel" class="login-panel hidden">
-  <div class="login-card">
-    <button class="close-btn" id="closeLogin">×</button>
 
-    <h2>Acessar DynamicDoc</h2>
-    <p>Acesso restrito para usuários corporativos e administradores.</p>
+      <section id="loginPanel" class="login-panel hidden">
+        <div class="login-card">
+          <button class="close-btn" id="closeLogin">×</button>
+          <h2>Acessar DynamicDoc</h2>
+          <p>Acesso restrito para usuários corporativos e administradores.</p>
 
-    <label>E-mail</label>
-    <input id="loginEmail" type="email" placeholder="nome@dynamictravel.com.br" />
+          <label>E-mail</label>
+          <input id="loginEmail" type="email" placeholder="nome@dynamictravel.com.br" autocomplete="email" />
 
-    <label>Senha</label>
-    <input id="loginPassword" type="password" placeholder="Digite sua senha" />
+          <label>Senha</label>
+          <input id="loginPassword" type="password" placeholder="Digite sua senha" autocomplete="current-password" />
 
-    <button class="primary-btn full" id="confirmLogin">Entrar</button>
-
-    <button class="ghost-btn full" id="forgotPasswordBtn" style="margin-top:10px;">
-      Esqueci minha senha
-    </button>
-  </div>
-</section>
-          </select>
-          <label>Departamento</label>
-          <select id="loginDepartment">
-            <option>Suporte</option>
-            <option>Financeiro</option>
-            <option>Eventos</option>
-            <option>Operação</option>
-          </select>
           <button class="primary-btn full" id="confirmLogin">Entrar no portal</button>
+          <button class="ghost-btn full" id="forgotPasswordBtn" style="margin-top:10px;">Esqueci minha senha</button>
         </div>
       </section>
 
@@ -411,10 +396,11 @@
                 <option>Operação</option>
               </select>
               <select id="agencyAccess">
-                <option value="usuario corporativo">Usuário corporativo</option>
+                <option value="colaborador">Usuário corporativo</option>
                 <option value="colaborador">Colaborador</option>
-                <option value="administrador">Administrador</option>
+                <option value="admin">Administrador</option>
               </select>
+              <input id="agencyPassword" type="password" placeholder="Senha temporária" />
               <button class="primary-btn" id="addAgencyUser">+ Cadastrar usuário</button>
             </div>
             <div class="table-wrap">
@@ -462,3 +448,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
