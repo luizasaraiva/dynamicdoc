@@ -137,6 +137,166 @@ async function deleteSupabase(table, id) {
     alert(`Excluído localmente, mas houve erro ao sincronizar com Supabase: ${error.message}`);
   }
 }
+
+
+// ===== Autenticação real com Supabase Auth =====
+function profileRoleToLabel(role = 'usuario') {
+  const labels = {
+    admin: 'Administrador',
+    colaborador: 'Usuário corporativo',
+    usuario: 'Usuário comum'
+  };
+  return labels[role] || role;
+}
+
+async function getLoggedUser() {
+  if (!supabaseDb) return null;
+
+  const { data: sessionData, error: sessionError } = await supabaseDb.auth.getSession();
+  if (sessionError) {
+    console.warn('Erro ao recuperar sessão:', sessionError.message);
+    return null;
+  }
+
+  const authUser = sessionData?.session?.user;
+  if (!authUser) return null;
+
+  const { data: profile, error: profileError } = await supabaseDb
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .single();
+
+  if (profileError || !profile) {
+    console.warn('Perfil não encontrado:', profileError?.message);
+    return {
+      id: authUser.id,
+      name: authUser.email,
+      email: authUser.email,
+      role: 'usuario',
+      department: 'Sem departamento',
+      company: ''
+    };
+  }
+
+  return {
+    id: profile.id,
+    name: profile.nome || authUser.email,
+    email: profile.email || authUser.email,
+    role: profile.perfil || 'usuario',
+    department: profile.departamento || 'Sem departamento',
+    company: profile.empresa || ''
+  };
+}
+
+async function loginWithSupabase(email, password) {
+  if (!supabaseDb) {
+    alert('Supabase não conectado. Confira o arquivo supabase-config.js.');
+    return false;
+  }
+
+  const { error } = await supabaseDb.auth.signInWithPassword({ email, password });
+  if (error) {
+    alert('Erro no login: ' + error.message);
+    return false;
+  }
+
+  currentUser = await getLoggedUser();
+
+  if (!currentUser || currentUser.role === 'usuario') {
+    await supabaseDb.auth.signOut();
+    currentUser = null;
+    localStorage.removeItem('dynamicdoc-user');
+    alert('Acesso restrito a usuários corporativos e administradores.');
+    refresh();
+    return false;
+  }
+
+  saveUser();
+  refresh();
+  navigate('home');
+  return true;
+}
+
+async function logoutSupabase() {
+  if (supabaseDb) await supabaseDb.auth.signOut();
+  currentUser = null;
+  localStorage.removeItem('dynamicdoc-user');
+  refresh();
+  navigate('home');
+}
+
+async function createUserSupabase({ nome, email, password, perfil, departamento, empresa = '' }) {
+  if (!supabaseReady || !window.supabase) {
+    alert('Supabase não conectado. Usuário será salvo apenas localmente.');
+    return null;
+  }
+
+  const tempClient = window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
+
+  const { data, error } = await tempClient.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { nome, perfil, departamento, empresa }
+    }
+  });
+
+  if (error) {
+    alert('Erro ao cadastrar usuário no Auth: ' + error.message);
+    return null;
+  }
+
+  const userId = data?.user?.id;
+  if (!userId) {
+    alert('Cadastro iniciado. Verifique o e-mail para confirmar o acesso.');
+    return null;
+  }
+
+  const profilePayload = {
+    id: userId,
+    nome,
+    email,
+    perfil,
+    departamento,
+    empresa
+  };
+
+  const { error: profileError } = await supabaseDb
+    .from('profiles')
+    .upsert(profilePayload, { onConflict: 'id' });
+
+  if (profileError) {
+    alert('Usuário criado no Auth, mas houve erro ao salvar o perfil: ' + profileError.message);
+    return null;
+  }
+
+  return { id: userId, ...profilePayload };
+}
+
+async function resetPasswordSupabase(email) {
+  if (!supabaseDb) {
+    alert('Supabase não conectado.');
+    return;
+  }
+
+  const { error } = await supabaseDb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+
+  if (error) {
+    alert('Erro ao enviar redefinição: ' + error.message);
+    return;
+  }
+
+  alert('Link de redefinição enviado para: ' + email);
+}
 const saveUser = () => localStorage.setItem('dynamicdoc-user', JSON.stringify(currentUser));
 const systemName = (id) => db.systems.find(s => s.id === id)?.name || id;
 const deptName = (id) => db.departments.find(d => d.id === id)?.name || id;
@@ -147,7 +307,7 @@ const isCommonUser = () => !currentUser || currentUser.role === 'usuario';
 
 function updateAccessView() {
   $('currentUserName').textContent = currentUser?.name || 'Visitante';
-  $('currentUserRole').textContent = currentUser ? `${currentUser.role} • ${currentUser.department}` : 'Faça login';
+  $('currentUserRole').textContent = currentUser ? `${profileRoleToLabel(currentUser.role)} • ${currentUser.department}` : 'Faça login';
   $('loginBtn').textContent = currentUser ? 'Sair' : 'Entrar';
   $('loginBtn').classList.remove('hidden');
   document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
@@ -487,15 +647,38 @@ async function addAgencyUser() {
   const email = $('agencyEmail').value.trim();
   const department = $('agencyDepartment').value;
   const access = $('agencyAccess').value;
-  if (!name || !email) return alert('Preencha nome e e-mail do usuário agência.');
+  const password = $('agencyPassword')?.value.trim() || '';
+
+  if (!name || !email || !department || !access) {
+    return alert('Preencha nome, e-mail, departamento e nível de acesso do usuário agência.');
+  }
+
+  if (supabaseDb && !password) {
+    return alert('Informe uma senha temporária para criar o login real no Supabase.');
+  }
+
+  if (supabaseDb) {
+    const createdUser = await createUserSupabase({
+      nome: name,
+      email,
+      password,
+      perfil: access,
+      departamento: department,
+      empresa: 'Dynamic Travel'
+    });
+
+    if (!createdUser) return;
+  }
+
   const payload = { id: crypto.randomUUID(), name, email, department, access };
   db.agencyUsers.unshift(payload);
-  ['agencyName','agencyEmail'].forEach(id => $(id).value = '');
+  ['agencyName','agencyEmail','agencyPassword'].forEach(id => { if ($(id)) $(id).value = ''; });
   saveDb();
   await upsertSupabase('usuarios_agencia', payload);
   renderAgencyUsers();
   renderArticleChart();
   renderProcesses();
+  alert('Usuário cadastrado. Ele já pode acessar com e-mail e senha após confirmação, se o Supabase exigir confirmação de e-mail.');
 }
 
 function renderProcesses(systemFilter = selectedProcessSystem) {
@@ -824,18 +1007,36 @@ saveArticle = async function() {
 
 
 document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.page)));
-$('loginBtn').addEventListener('click', () => {
+
+$('loginBtn').addEventListener('click', async () => {
   if (currentUser) {
-    currentUser = null;
-    localStorage.removeItem('dynamicdoc-user');
-    refresh();
-    navigate('home');
+    await logoutSupabase();
     return;
   }
   $('loginPanel').classList.remove('hidden');
 });
+
 $('closeLogin').addEventListener('click', () => $('loginPanel').classList.add('hidden'));
 
+if ($('forgotPasswordBtn')) {
+  $('forgotPasswordBtn').addEventListener('click', async () => {
+    const email = $('loginEmail').value.trim();
+    if (!email) return alert('Informe seu e-mail para redefinir a senha.');
+    await resetPasswordSupabase(email);
+  });
+}
+
+if ($('confirmLogin')) {
+  $('confirmLogin').addEventListener('click', async () => {
+    const email = $('loginEmail').value.trim();
+    const password = $('loginPassword').value.trim();
+
+    if (!email || !password) return alert('Preencha e-mail e senha.');
+
+    const ok = await loginWithSupabase(email, password);
+    if (ok) $('loginPanel').classList.add('hidden');
+  });
+}
 
 document.querySelectorAll('.access-tab').forEach(btn => btn.addEventListener('click', () => {
   document.querySelectorAll('.access-tab').forEach(tab => tab.classList.remove('active'));
@@ -844,63 +1045,45 @@ document.querySelectorAll('.access-tab').forEach(btn => btn.addEventListener('cl
   $(btn.dataset.accessTab).classList.add('active-access-box');
 }));
 
-$('accessLoginBtn').addEventListener('click', () => {
-  const email = $('accessEmail').value.trim();
-  const role = $('accessRole').value;
-  const department = $('accessDepartment').value;
-  if (!email || !$('accessPassword').value.trim()) return alert('Preencha e-mail e senha para acessar.');
-  currentUser = {
-    name: email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    email,
-    role,
-    department
-  };
-  saveUser();
-  async function startDynamicDoc() {
-  await loadSupabaseData();
-  refresh();
-  navigate(document.querySelector('.page.active-page')?.id || 'home');
+if ($('accessLoginBtn')) {
+  $('accessLoginBtn').addEventListener('click', async () => {
+    const email = $('accessEmail').value.trim();
+    const password = $('accessPassword').value.trim();
+    if (!email || !password) return alert('Preencha e-mail e senha para acessar.');
+    await loginWithSupabase(email, password);
+  });
 }
 
-startDynamicDoc();
-  navigate('home');
-});
-
-$('recoverBtn').addEventListener('click', () => {
-  if (!$('recoverEmail').value.trim()) return alert('Informe o e-mail cadastrado.');
-  $('recoverMessage').classList.remove('hidden');
-});
-
-$('requestAccessBtn').addEventListener('click', async () => {
-  const name = $('requestName').value.trim();
-  const email = $('requestEmail').value.trim();
-  const company = $('requestCompany').value.trim();
-  if (!name || !email || !company) return alert('Preencha nome, e-mail corporativo e empresa.');
-  const payload = { id: crypto.randomUUID(), name, email, company, role: 'usuário comum' };
-  db.clients.unshift(payload);
-  saveDb();
-  await upsertSupabase('clientes', payload);
-  renderClients();
-  $('requestMessage').classList.remove('hidden');
-  ['requestName','requestEmail','requestCompany','requestReason'].forEach(id => $(id).value = '');
-});
-
-$('confirmLogin').addEventListener('click', () => {
-  currentUser = {
-    name: $('loginName').value.trim() || 'Usuário Dynamic',
-    role: $('loginRole').value,
-    department: $('loginDepartment').value
-  };
-  saveUser();
-  $('loginPanel').classList.add('hidden');
-  async function startDynamicDoc() {
-  await loadSupabaseData();
-  refresh();
-  navigate(document.querySelector('.page.active-page')?.id || 'home');
+if ($('recoverBtn')) {
+  $('recoverBtn').addEventListener('click', async () => {
+    const email = $('recoverEmail').value.trim();
+    if (!email) return alert('Informe o e-mail cadastrado.');
+    await resetPasswordSupabase(email);
+    $('recoverMessage').classList.remove('hidden');
+  });
 }
 
-startDynamicDoc();
-});
+if ($('requestAccessBtn')) {
+  $('requestAccessBtn').addEventListener('click', async () => {
+    const name = $('requestName').value.trim();
+    const email = $('requestEmail').value.trim();
+    const company = $('requestCompany').value.trim();
+    const department = $('requestDepartment').value;
+    if (!name || !email || !company) return alert('Preencha nome, e-mail corporativo e empresa.');
+    const payload = { id: crypto.randomUUID(), name, email, company, role: 'usuário comum', department };
+    db.clients.unshift(payload);
+    saveDb();
+    await upsertSupabase('clientes', payload);
+    renderClients();
+    $('requestMessage').classList.remove('hidden');
+    ['requestName','requestEmail','requestCompany','requestReason'].forEach(id => { if ($(id)) $(id).value = ''; });
+  });
+}
+
+async function resetPassword(type, email) {
+  await resetPasswordSupabase(email);
+}
+
 $('closeArticle').addEventListener('click', closeArticleModal);
 $('articleModal').addEventListener('click', (event) => {
   if (event.target.id === 'articleModal') closeArticleModal();
@@ -936,8 +1119,16 @@ document.querySelectorAll('.doc-toolbar button').forEach(button => {
 
 async function startDynamicDoc() {
   await loadSupabaseData();
+
+  if (supabaseDb) {
+    currentUser = await getLoggedUser();
+    if (currentUser) saveUser();
+    else localStorage.removeItem('dynamicdoc-user');
+  }
+
   refresh();
   navigate(document.querySelector('.page.active-page')?.id || 'home');
 }
 
 startDynamicDoc();
+
