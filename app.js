@@ -73,7 +73,7 @@ const initialData = {
 let db = JSON.parse(localStorage.getItem('dynamicdoc-db')) || initialData;
 db.clients = db.clients || initialData.clients;
 db.agencyUsers = db.agencyUsers || initialData.agencyUsers;
-db.articles = (db.articles || []).map(a => ({ kind: a.kind || 'article', comments: a.comments || [], likes: 0, dislikes: 0, version: '1.0', homologation: 'homologado', history: [], ...a }));
+db.articles = (db.articles || []).map(a => ({ kind: a.kind || 'article', comments: a.comments || [], likes: 0, dislikes: 0, version: '1.0', homologation: 'homologado', history: [], module: a.module || a.modulo || 'Geral', ...a }));
 db.favorites = db.favorites || [];
 db.portalBanner = db.portalBanner || '';
 let currentUser = JSON.parse(localStorage.getItem('dynamicdoc-user')) || null;
@@ -112,7 +112,8 @@ async function loadSupabaseData() {
       ...a,
       tags: Array.isArray(a.tags) ? a.tags : [],
       comments: Array.isArray(a.comments) ? a.comments : [],
-      kind: a.kind || 'article'
+      kind: a.kind || 'article',
+      module: a.module || a.modulo || 'Geral'
     }));
   }
   if (clientsRes.data?.length) db.clients = clientsRes.data;
@@ -232,12 +233,6 @@ async function createUserSupabase({ nome, email, password, perfil, departamento,
     return null;
   }
 
-  if (!email || !password) {
-    alert('Informe e-mail e senha temporária.');
-    return null;
-  }
-
-  // Cliente temporário para criar outro usuário sem derrubar a sessão do admin logado.
   const tempClient = window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey, {
     auth: {
       persistSession: false,
@@ -255,13 +250,13 @@ async function createUserSupabase({ nome, email, password, perfil, departamento,
   });
 
   if (error) {
-    alert('Erro ao cadastrar usuário no Supabase Auth: ' + error.message);
+    alert('Erro ao cadastrar usuário no Auth: ' + error.message);
     return null;
   }
 
   const userId = data?.user?.id;
   if (!userId) {
-    alert('Cadastro iniciado. Se a confirmação de e-mail estiver ativa no Supabase, confirme o e-mail antes de acessar.');
+    alert('Cadastro iniciado. Verifique o e-mail para confirmar o acesso.');
     return null;
   }
 
@@ -274,14 +269,13 @@ async function createUserSupabase({ nome, email, password, perfil, departamento,
     empresa
   };
 
-  // O trigger do banco cria o profile automaticamente.
-  // Este upsert é um reforço caso o trigger ainda não tenha sido criado no Supabase.
   const { error: profileError } = await supabaseDb
     .from('profiles')
     .upsert(profilePayload, { onConflict: 'id' });
 
   if (profileError) {
-    console.warn('Profile não foi salvo pelo cliente, aguardando trigger do banco:', profileError.message);
+    alert('Usuário criado no Auth, mas houve erro ao salvar o perfil: ' + profileError.message);
+    return null;
   }
 
   return { id: userId, ...profilePayload };
@@ -512,6 +506,7 @@ function editArticle(id) {
   $('formSummary').value = a.summary;
   $('formSystem').value = a.system;
   $('formDepartment').value = a.department;
+  if ($('formModule')) $('formModule').value = a.module || 'Geral';
   $('formStatus').value = a.status;
   $('formTags').value = a.tags.join(', ');
   $('formImage').value = a.image || '';
@@ -547,6 +542,7 @@ async function saveArticle() {
     summary: $('formSummary').value.trim() || 'Resumo não informado.',
     system: $('formSystem').value,
     department: $('formDepartment').value,
+    module: $('formModule')?.value.trim() || 'Geral',
     status: $('formStatus').value,
     tags: $('formTags').value.split(',').map(t => t.trim()).filter(Boolean),
     image: $('formImage').value.trim(),
@@ -569,7 +565,7 @@ async function saveArticle() {
 }
 
 function clearForm() {
-  ['articleId','formTitle','formSummary','formTags','formImage','formVideo'].forEach(id => $(id).value = '');
+  ['articleId','formTitle','formSummary','formTags','formImage','formVideo','formModule'].forEach(id => { if ($(id)) $(id).value = ''; });
   setEditorContent('');
   if ($('formStatus')) $('formStatus').value = 'publicado';
   if ($('formSystem')) $('formSystem').selectedIndex = 0;
@@ -722,7 +718,7 @@ function newArticle(kind = 'article') {
   if ($('formKind')) $('formKind').value = kind;
   if ($('formStatus')) $('formStatus').value = 'publicado';
   $('articleEditorTitle').textContent = kind === 'process' ? 'Novo processo interno' : 'Novo artigo';
-  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos que aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
+  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos por Sistema e Módulo. Eles aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
   navigate('articleEditor');
 }
 
@@ -803,7 +799,7 @@ function newArticle(kind = 'article') {
   if ($('formKind')) $('formKind').value = kind;
   if ($('formStatus')) $('formStatus').value = 'publicado';
   $('articleEditorTitle').textContent = kind === 'process' ? 'Novo processo interno' : 'Novo artigo';
-  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos que aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
+  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos por Sistema e Módulo. Eles aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
   navigate('articleEditor');
 }
 
@@ -956,15 +952,54 @@ function renderProcesses() {
   const board = $('processBoard');
   const list = $('processList');
   if (!board || !list) return;
-  board.innerHTML = db.systems.map(s => {
-    const processes = visibleArticles('process').filter(a => a.system === s.id);
+
+  const processes = visibleArticles('process');
+
+  board.innerHTML = db.systems.map(system => {
+    const systemProcesses = processes.filter(article => article.system === system.id);
+    const modules = [...new Set(systemProcesses.map(article => article.module || 'Geral'))].sort((a, b) => a.localeCompare(b));
+
     return `
-      <article class="process-column">
-        <h4>${s.name}</h4>
-        ${processes.length ? processes.map(p => `<button class="process-link" onclick="openArticle('${p.id}')"><strong>${p.title}</strong><span>${p.summary}</span></button>`).join('') : '<p class="muted small-muted">Nenhum processo cadastrado.</p>'}
+      <article class="process-system-card">
+        <div class="process-system-header">
+          <div>
+            <span class="process-kicker">Sistema</span>
+            <h4>${system.name}</h4>
+          </div>
+          <span class="process-count">${systemProcesses.length} artigo(s)</span>
+        </div>
+
+        ${modules.length ? modules.map(moduleName => {
+          const moduleArticles = systemProcesses.filter(article => (article.module || 'Geral') === moduleName);
+          return `
+            <div class="process-module-block">
+              <button class="process-module-title" type="button">
+                <span>Módulo</span>
+                <strong>${moduleName}</strong>
+              </button>
+
+              <div class="process-module-articles">
+                ${moduleArticles.map(article => `
+                  <div class="process-article-line" onclick="openArticle('${article.id}')">
+                    <div>
+                      <strong>${article.title}</strong>
+                      <p>${article.summary}</p>
+                    </div>
+                    <div class="process-actions" onclick="event.stopPropagation()">
+                      <button class="ghost-btn" onclick="openArticle('${article.id}')">Abrir</button>
+                      ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="editArticle('${article.id}')">Editar</button>` : ''}
+                      ${isAdmin() ? `<button class="danger-btn" onclick="deleteArticle('${article.id}')">Excluir</button>` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('') : '<p class="muted small-muted">Nenhum processo cadastrado neste sistema.</p>'}
       </article>
     `;
   }).join('');
+
   list.innerHTML = '';
 }
 
