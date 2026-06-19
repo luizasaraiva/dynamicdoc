@@ -1,3 +1,9 @@
+-- DynamicDoc | Banco de dados + Auth
+-- Cole este SQL no Supabase > SQL Editor > New query > Run
+
+-- =========================
+-- ARTIGOS E PROCESSOS
+-- =========================
 create table if not exists public.artigos (
   id text primary key,
   title text,
@@ -192,3 +198,47 @@ with check (
     and p.perfil = 'admin'
   )
 );
+
+-- =========================
+-- MÓDULOS DE PROCESSOS INTERNOS
+-- =========================
+create table if not exists public.modulos_processos (
+  id text primary key,
+  system text not null,
+  name text not null,
+  "createdAt" text default to_char(now(), 'DD/MM/YYYY')
+);
+
+alter table public.modulos_processos enable row level security;
+
+drop policy if exists "permitir leitura modulos processos" on public.modulos_processos;
+create policy "permitir leitura modulos processos"
+on public.modulos_processos
+for select
+using (true);
+
+drop policy if exists "permitir cadastro modulos processos" on public.modulos_processos;
+create policy "permitir cadastro modulos processos"
+on public.modulos_processos
+for insert
+with check (true);
+
+drop policy if exists "permitir edicao modulos processos" on public.modulos_processos;
+create policy "permitir edicao modulos processos"
+on public.modulos_processos
+for update
+using (true)
+with check (true);
+
+drop policy if exists "permitir exclusao modulos processos" on public.modulos_processos;
+create policy "permitir exclusao modulos processos"
+on public.modulos_processos
+for delete
+using (true);
+
+alter table public.artigos
+add column if not exists module text default 'Geral';
+
+update public.artigos
+set module = 'Geral'
+where module is null;
