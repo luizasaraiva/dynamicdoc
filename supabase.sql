@@ -192,4 +192,3 @@ with check (
     and p.perfil = 'admin'
   )
 );
-
