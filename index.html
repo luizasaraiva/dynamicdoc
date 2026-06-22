@@ -55,21 +55,15 @@
           <button class="close-btn" id="closeLogin">×</button>
           <h2>Acessar DynamicDoc</h2>
           <p>Acesso restrito para usuários corporativos e administradores.</p>
-          <label>Nome</label>
-          <input id="loginName" type="text" placeholder="Ex: Luiza Saraiva" />
-          <label>Perfil</label>
-          <select id="loginRole">
-            <option value="colaborador">Usuário corporativo</option>
-            <option value="admin">Administrador</option>
-          </select>
-          <label>Departamento</label>
-          <select id="loginDepartment">
-            <option>Suporte</option>
-            <option>Financeiro</option>
-            <option>Eventos</option>
-            <option>Operação</option>
-          </select>
+
+          <label>E-mail</label>
+          <input id="loginEmail" type="email" placeholder="nome@dynamictravel.com.br" />
+
+          <label>Senha</label>
+          <input id="loginPassword" type="password" placeholder="Digite sua senha" />
+
           <button class="primary-btn full" id="confirmLogin">Entrar no portal</button>
+          <button class="ghost-btn full" id="forgotPasswordBtn" style="margin-top:10px;">Esqueci minha senha</button>
         </div>
       </section>
 
@@ -474,4 +468,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
