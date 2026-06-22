@@ -918,3 +918,48 @@ body.access-mode .access-card {
     justify-content: flex-start;
   }
 }
+
+/* Ajuste solicitado: busca de artigos maior e filtros mais compactos */
+#articles .filters {
+  display: grid;
+  grid-template-columns: minmax(420px, 2.6fr) minmax(130px, 0.75fr) minmax(130px, 0.75fr) minmax(120px, 0.6fr);
+  align-items: center;
+  gap: 8px;
+}
+
+#articles #articleSearch {
+  min-width: 0;
+  width: 100%;
+}
+
+#articles #filterSystem,
+#articles #filterDepartment,
+#articles #filterStatus {
+  min-width: 0;
+  width: 100%;
+  max-width: 170px;
+  justify-self: end;
+}
+
+@media (max-width: 1050px) {
+  #articles .filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #articles #articleSearch {
+    grid-column: 1 / -1;
+  }
+
+  #articles #filterSystem,
+  #articles #filterDepartment,
+  #articles #filterStatus {
+    max-width: none;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  #articles .filters {
+    grid-template-columns: 1fr;
+  }
+}
