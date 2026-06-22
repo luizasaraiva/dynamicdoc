@@ -110,7 +110,7 @@ async function loadSupabaseData() {
   const [articlesRes, clientsRes, agencyRes, modulesRes] = await Promise.all([
     supabaseDb.from('artigos').select('*').order('updatedAt', { ascending: false }),
     supabaseDb.from('clientes').select('*').order('name', { ascending: true }),
-    supabaseDb.from('usuarios_agencia').select('*').order('name', { ascending: true }),
+    supabaseDb.from('profiles').select('*').in('perfil', ['admin','colaborador']).order('nome', { ascending: true }),
     supabaseDb.from('modulos').select('*').order('name', { ascending: true })
   ]);
 
@@ -128,7 +128,15 @@ async function loadSupabaseData() {
     }));
   }
   if (clientsRes.data?.length) db.clients = clientsRes.data;
-  if (agencyRes.data?.length) db.agencyUsers = agencyRes.data;
+  if (agencyRes.data?.length) {
+    db.agencyUsers = agencyRes.data.map(user => ({
+      id: user.id,
+      name: user.nome,
+      email: user.email,
+      department: user.departamento,
+      access: user.perfil
+    }));
+  }
   if (modulesRes?.data?.length) db.modules = modulesRes.data;
   saveDb();
 }
@@ -1197,3 +1205,4 @@ async function startDynamicDoc() {
 }
 
 startDynamicDoc();
+
