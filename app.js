@@ -11,12 +11,14 @@ const initialData = {
     { id: 'eventos', name: 'Eventos', description: 'Fluxos e materiais de apoio para eventos e grupos.' },
     { id: 'operacao', name: 'Operação', description: 'Procedimentos operacionais, execução e acompanhamento.' }
   ],
-  processModules: [
-    { id: crypto.randomUUID(), system: 'argo', name: 'Cadastros' },
-    { id: crypto.randomUUID(), system: 'argo', name: 'Aprovações' },
-    { id: crypto.randomUUID(), system: 'reserve', name: 'Cadastros' },
-    { id: crypto.randomUUID(), system: 'wts', name: 'Operação' },
-    { id: crypto.randomUUID(), system: 'reserva-facil', name: 'Pesquisa' }
+  modules: [
+    { id: 'argo-cadastros', system: 'argo', name: 'Cadastros' },
+    { id: 'argo-aprovacoes', system: 'argo', name: 'Aprovações' },
+    { id: 'argo-politicas', system: 'argo', name: 'Políticas' },
+    { id: 'reserve-cadastros', system: 'reserve', name: 'Cadastros' },
+    { id: 'reserve-emissoes', system: 'reserve', name: 'Emissões' },
+    { id: 'wts-operacao', system: 'wts', name: 'Operação' },
+    { id: 'reserva-facil-pesquisa', system: 'reserva-facil', name: 'Pesquisa' }
   ],
   clients: [
     { id: crypto.randomUUID(), name: 'Mariana Costa', email: 'mariana.costa@empresa.com', company: 'Empresa Modelo', role: 'usuário comum' },
@@ -80,8 +82,8 @@ const initialData = {
 let db = JSON.parse(localStorage.getItem('dynamicdoc-db')) || initialData;
 db.clients = db.clients || initialData.clients;
 db.agencyUsers = db.agencyUsers || initialData.agencyUsers;
-db.processModules = db.processModules || initialData.processModules;
-db.articles = (db.articles || []).map(a => ({ kind: a.kind || 'article', comments: a.comments || [], likes: 0, dislikes: 0, version: '1.0', homologation: 'homologado', history: [], module: a.module || a.modulo || 'Geral', ...a }));
+db.modules = db.modules || initialData.modules || [];
+db.articles = (db.articles || []).map(a => ({ kind: a.kind || 'article', comments: a.comments || [], likes: 0, dislikes: 0, version: '1.0', homologation: 'homologado', history: [], module: a.module || a.module_id || '', ...a }));
 db.favorites = db.favorites || [];
 db.portalBanner = db.portalBanner || '';
 let currentUser = JSON.parse(localStorage.getItem('dynamicdoc-user')) || null;
@@ -98,7 +100,6 @@ const supabaseDb = supabaseReady ? window.supabase.createClient(supabaseSettings
 let selectedArticleId = null;
 let editorReturnPage = 'articles';
 let selectedProcessSystem = '';
-let selectedProcessModule = '';
 
 const $ = (id) => document.getElementById(id);
 const saveDb = () => localStorage.setItem('dynamicdoc-db', JSON.stringify(db));
@@ -110,26 +111,25 @@ async function loadSupabaseData() {
     supabaseDb.from('artigos').select('*').order('updatedAt', { ascending: false }),
     supabaseDb.from('clientes').select('*').order('name', { ascending: true }),
     supabaseDb.from('usuarios_agencia').select('*').order('name', { ascending: true }),
-    supabaseDb.from('modulos_processos').select('*').order('name', { ascending: true })
+    supabaseDb.from('modulos').select('*').order('name', { ascending: true })
   ]);
 
   if (articlesRes.error) console.warn('Erro ao carregar artigos do Supabase:', articlesRes.error.message);
   if (clientsRes.error) console.warn('Erro ao carregar clientes do Supabase:', clientsRes.error.message);
   if (agencyRes.error) console.warn('Erro ao carregar usuários agência do Supabase:', agencyRes.error.message);
-  if (modulesRes.error) console.warn('Erro ao carregar módulos de processos do Supabase:', modulesRes.error.message);
+  if (modulesRes?.error) console.warn('Erro ao carregar módulos do Supabase:', modulesRes.error.message);
 
   if (articlesRes.data?.length) {
     db.articles = articlesRes.data.map(a => ({
       ...a,
       tags: Array.isArray(a.tags) ? a.tags : [],
       comments: Array.isArray(a.comments) ? a.comments : [],
-      kind: a.kind || 'article',
-      module: a.module || a.modulo || 'Geral'
+      kind: a.kind || 'article'
     }));
   }
   if (clientsRes.data?.length) db.clients = clientsRes.data;
   if (agencyRes.data?.length) db.agencyUsers = agencyRes.data;
-  if (modulesRes.data?.length) db.processModules = modulesRes.data;
+  if (modulesRes?.data?.length) db.modules = modulesRes.data;
   saveDb();
 }
 
@@ -150,166 +150,6 @@ async function deleteSupabase(table, id) {
     alert(`Excluído localmente, mas houve erro ao sincronizar com Supabase: ${error.message}`);
   }
 }
-
-
-// ===== Autenticação real com Supabase Auth =====
-function profileRoleToLabel(role = 'usuario') {
-  const labels = {
-    admin: 'Administrador',
-    colaborador: 'Usuário corporativo',
-    usuario: 'Usuário comum'
-  };
-  return labels[role] || role;
-}
-
-async function getLoggedUser() {
-  if (!supabaseDb) return null;
-
-  const { data: sessionData, error: sessionError } = await supabaseDb.auth.getSession();
-  if (sessionError) {
-    console.warn('Erro ao recuperar sessão:', sessionError.message);
-    return null;
-  }
-
-  const authUser = sessionData?.session?.user;
-  if (!authUser) return null;
-
-  const { data: profile, error: profileError } = await supabaseDb
-    .from('profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .single();
-
-  if (profileError || !profile) {
-    console.warn('Perfil não encontrado:', profileError?.message);
-    return {
-      id: authUser.id,
-      name: authUser.email,
-      email: authUser.email,
-      role: 'usuario',
-      department: 'Sem departamento',
-      company: ''
-    };
-  }
-
-  return {
-    id: profile.id,
-    name: profile.nome || authUser.email,
-    email: profile.email || authUser.email,
-    role: profile.perfil || 'usuario',
-    department: profile.departamento || 'Sem departamento',
-    company: profile.empresa || ''
-  };
-}
-
-async function loginWithSupabase(email, password) {
-  if (!supabaseDb) {
-    alert('Supabase não conectado. Confira o arquivo supabase-config.js.');
-    return false;
-  }
-
-  const { error } = await supabaseDb.auth.signInWithPassword({ email, password });
-  if (error) {
-    alert('Erro no login: ' + error.message);
-    return false;
-  }
-
-  currentUser = await getLoggedUser();
-
-  if (!currentUser || currentUser.role === 'usuario') {
-    await supabaseDb.auth.signOut();
-    currentUser = null;
-    localStorage.removeItem('dynamicdoc-user');
-    alert('Acesso restrito a usuários corporativos e administradores.');
-    refresh();
-    return false;
-  }
-
-  saveUser();
-  refresh();
-  navigate('home');
-  return true;
-}
-
-async function logoutSupabase() {
-  if (supabaseDb) await supabaseDb.auth.signOut();
-  currentUser = null;
-  localStorage.removeItem('dynamicdoc-user');
-  refresh();
-  navigate('home');
-}
-
-async function createUserSupabase({ nome, email, password, perfil, departamento, empresa = '' }) {
-  if (!supabaseReady || !window.supabase) {
-    alert('Supabase não conectado. Usuário será salvo apenas localmente.');
-    return null;
-  }
-
-  const tempClient = window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    }
-  });
-
-  const { data, error } = await tempClient.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { nome, perfil, departamento, empresa }
-    }
-  });
-
-  if (error) {
-    alert('Erro ao cadastrar usuário no Auth: ' + error.message);
-    return null;
-  }
-
-  const userId = data?.user?.id;
-  if (!userId) {
-    alert('Cadastro iniciado. Verifique o e-mail para confirmar o acesso.');
-    return null;
-  }
-
-  const profilePayload = {
-    id: userId,
-    nome,
-    email,
-    perfil,
-    departamento,
-    empresa
-  };
-
-  const { error: profileError } = await supabaseDb
-    .from('profiles')
-    .upsert(profilePayload, { onConflict: 'id' });
-
-  if (profileError) {
-    alert('Usuário criado no Auth, mas houve erro ao salvar o perfil: ' + profileError.message);
-    return null;
-  }
-
-  return { id: userId, ...profilePayload };
-}
-
-async function resetPasswordSupabase(email) {
-  if (!supabaseDb) {
-    alert('Supabase não conectado.');
-    return;
-  }
-
-  const { error } = await supabaseDb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin
-  });
-
-  if (error) {
-    alert('Erro ao enviar redefinição: ' + error.message);
-    return;
-  }
-
-  alert('Link de redefinição enviado para: ' + email);
-}
 const saveUser = () => localStorage.setItem('dynamicdoc-user', JSON.stringify(currentUser));
 const systemName = (id) => db.systems.find(s => s.id === id)?.name || id;
 const deptName = (id) => db.departments.find(d => d.id === id)?.name || id;
@@ -320,7 +160,7 @@ const isCommonUser = () => !currentUser || currentUser.role === 'usuario';
 
 function updateAccessView() {
   $('currentUserName').textContent = currentUser?.name || 'Visitante';
-  $('currentUserRole').textContent = currentUser ? `${profileRoleToLabel(currentUser.role)} • ${currentUser.department}` : 'Faça login';
+  $('currentUserRole').textContent = currentUser ? `${currentUser.role} • ${currentUser.department}` : 'Faça login';
   $('loginBtn').textContent = currentUser ? 'Sair' : 'Entrar';
   $('loginBtn').classList.remove('hidden');
   document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
@@ -331,6 +171,56 @@ function updateAccessView() {
   if (isCommonUser() && document.querySelector('#departments.active-page')) navigate('home');
 }
 
+
+function slugify(text) {
+  return String(text || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || crypto.randomUUID();
+}
+
+function modulesBySystem(systemId) {
+  return (db.modules || []).filter(m => m.system === systemId).sort((a,b) => a.name.localeCompare(b.name));
+}
+
+function moduleName(moduleId) {
+  const m = (db.modules || []).find(item => item.id === moduleId || item.name === moduleId);
+  return m?.name || moduleId || 'Sem módulo';
+}
+
+function updateModuleSelect(selectedValue = '') {
+  const select = $('formModule');
+  if (!select) return;
+  const system = $('formSystem')?.value || '';
+  const modules = modulesBySystem(system);
+  select.innerHTML = modules.length
+    ? '<option value="">Selecione um módulo</option>' + modules.map(m => `<option value="${m.id}">${m.name}</option>`).join('')
+    : '<option value="">Nenhum módulo cadastrado para este sistema</option>';
+  if (selectedValue) select.value = selectedValue;
+}
+
+function fillModuleAdminSelect() {
+  if ($('newModuleSystem')) {
+    $('newModuleSystem').innerHTML = db.systems.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  }
+}
+
+async function addModule() {
+  if (!isAdmin()) return alert('Apenas administradores podem criar módulos.');
+  const system = $('newModuleSystem')?.value;
+  const name = $('newModuleName')?.value.trim();
+  if (!system || !name) return alert('Selecione o sistema e informe o nome do módulo.');
+  const exists = (db.modules || []).some(m => m.system === system && m.name.toLowerCase() === name.toLowerCase());
+  if (exists) return alert('Este módulo já existe para o sistema selecionado.');
+  const payload = { id: `${system}-${slugify(name)}`, system, name };
+  db.modules.unshift(payload);
+  saveDb();
+  await upsertSupabase('modulos', payload);
+  $('newModuleName').value = '';
+  fillSelects();
+  renderProcesses();
+}
+
 function fillSelects() {
   const systemOptions = '<option value="">Todos os sistemas</option>' + db.systems.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   const deptOptions = '<option value="">Todos os departamentos</option>' + db.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
@@ -338,6 +228,8 @@ function fillSelects() {
   $('filterDepartment').innerHTML = deptOptions;
   if ($('formSystem')) $('formSystem').innerHTML = db.systems.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   if ($('formDepartment')) $('formDepartment').innerHTML = db.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  fillModuleAdminSelect();
+  updateModuleSelect($('formModule')?.value || '');
 }
 
 function renderCards() {
@@ -411,7 +303,7 @@ function renderAdminArticles() {
     <article class="article-item">
       <div>
         <h4>${a.title}</h4>
-        <p>${systemName(a.system)} • ${deptName(a.department)} • ${a.status}</p>
+        <p>${systemName(a.system)} • ${moduleName(a.module)} • ${deptName(a.department)} • ${a.status}</p>
       </div>
       <div class="top-actions">
         <button class="ghost-btn" onclick="selectArticleForComment('${a.id}')">Selecionar</button>
@@ -488,7 +380,7 @@ function openArticle(id) {
   if (!a) return;
   selectedArticleId = id;
   $('articleDetails').innerHTML = `
-    <span class="pill" style="background:#e8f1ff;color:#053798">${systemName(a.system)} • ${deptName(a.department)}</span>
+    <span class="pill" style="background:#e8f1ff;color:#053798">${systemName(a.system)} • ${moduleName(a.module)} • ${deptName(a.department)}</span>
     <h1>${a.title}</h1>
     <p class="muted">Atualizado em ${a.updatedAt} • Status: ${a.status}</p>
     ${a.image ? `<img class="article-cover" src="${a.image}" alt="Imagem do artigo">` : ''}
@@ -517,8 +409,8 @@ function editArticle(id) {
   $('formTitle').value = a.title;
   $('formSummary').value = a.summary;
   $('formSystem').value = a.system;
+  updateModuleSelect(a.module || '');
   $('formDepartment').value = a.department;
-  if ($('formModule')) $('formModule').value = a.module || 'Geral';
   $('formStatus').value = a.status;
   $('formTags').value = a.tags.join(', ');
   $('formImage').value = a.image || '';
@@ -553,8 +445,8 @@ async function saveArticle() {
     title: $('formTitle').value.trim() || 'Artigo sem título',
     summary: $('formSummary').value.trim() || 'Resumo não informado.',
     system: $('formSystem').value,
+    module: $('formModule')?.value || '',
     department: $('formDepartment').value,
-    module: $('formModule')?.value.trim() || 'Geral',
     status: $('formStatus').value,
     tags: $('formTags').value.split(',').map(t => t.trim()).filter(Boolean),
     image: $('formImage').value.trim(),
@@ -577,10 +469,11 @@ async function saveArticle() {
 }
 
 function clearForm() {
-  ['articleId','formTitle','formSummary','formTags','formImage','formVideo','formModule'].forEach(id => { if ($(id)) $(id).value = ''; });
+  ['articleId','formTitle','formSummary','formTags','formImage','formVideo'].forEach(id => $(id).value = '');
   setEditorContent('');
   if ($('formStatus')) $('formStatus').value = 'publicado';
   if ($('formSystem')) $('formSystem').selectedIndex = 0;
+  updateModuleSelect();
   if ($('formDepartment')) $('formDepartment').selectedIndex = 0;
   if ($('articleEditorTitle')) $('articleEditorTitle').textContent = 'Novo artigo';
   if ($('formKind')) $('formKind').value = 'article';
@@ -662,38 +555,15 @@ async function addAgencyUser() {
   const email = $('agencyEmail').value.trim();
   const department = $('agencyDepartment').value;
   const access = $('agencyAccess').value;
-  const password = $('agencyPassword')?.value.trim() || '';
-
-  if (!name || !email || !department || !access) {
-    return alert('Preencha nome, e-mail, departamento e nível de acesso do usuário agência.');
-  }
-
-  if (supabaseDb && !password) {
-    return alert('Informe uma senha temporária para criar o login real no Supabase.');
-  }
-
-  if (supabaseDb) {
-    const createdUser = await createUserSupabase({
-      nome: name,
-      email,
-      password,
-      perfil: access,
-      departamento: department,
-      empresa: 'Dynamic Travel'
-    });
-
-    if (!createdUser) return;
-  }
-
+  if (!name || !email) return alert('Preencha nome e e-mail do usuário agência.');
   const payload = { id: crypto.randomUUID(), name, email, department, access };
   db.agencyUsers.unshift(payload);
-  ['agencyName','agencyEmail','agencyPassword'].forEach(id => { if ($(id)) $(id).value = ''; });
+  ['agencyName','agencyEmail'].forEach(id => $(id).value = '');
   saveDb();
   await upsertSupabase('usuarios_agencia', payload);
   renderAgencyUsers();
   renderArticleChart();
   renderProcesses();
-  alert('Usuário cadastrado. Ele já pode acessar com e-mail e senha após confirmação, se o Supabase exigir confirmação de e-mail.');
 }
 
 function renderProcesses(systemFilter = selectedProcessSystem) {
@@ -730,7 +600,7 @@ function newArticle(kind = 'article') {
   if ($('formKind')) $('formKind').value = kind;
   if ($('formStatus')) $('formStatus').value = 'publicado';
   $('articleEditorTitle').textContent = kind === 'process' ? 'Novo processo interno' : 'Novo artigo';
-  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos por Sistema e Módulo. Eles aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
+  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos que aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
   navigate('articleEditor');
 }
 
@@ -811,7 +681,7 @@ function newArticle(kind = 'article') {
   if ($('formKind')) $('formKind').value = kind;
   if ($('formStatus')) $('formStatus').value = 'publicado';
   $('articleEditorTitle').textContent = kind === 'process' ? 'Novo processo interno' : 'Novo artigo';
-  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos por Sistema e Módulo. Eles aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
+  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos que aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
   navigate('articleEditor');
 }
 
@@ -942,7 +812,7 @@ function openArticle(id) {
   const related = articlesRelatedTo(a);
   const history = a.history?.length ? a.history.slice(0, 4).map(h => `<li>${h.date} — ${h.text}</li>`).join('') : `<li>${a.updatedAt || a.createdAt} — Versão inicial publicada.</li>`;
   $('articleDetails').innerHTML = `
-    <span class="pill" style="background:#e8f1ff;color:#053798">${systemName(a.system)} • ${deptName(a.department)}</span>
+    <span class="pill" style="background:#e8f1ff;color:#053798">${systemName(a.system)} • ${moduleName(a.module)} • ${deptName(a.department)}</span>
     <h1>${a.title}</h1>
     <p class="muted">Atualizado em ${a.updatedAt} • Versão ${a.version || '1.0'} • Status: ${a.status}</p>
     ${isAdmin() ? `<p><span class="tag status ${a.homologation || 'homologado'}">${a.homologation || 'homologado'}</span></p>` : ''}
@@ -960,157 +830,59 @@ function openArticle(id) {
   $('articleModal').classList.remove('hidden');
 }
 
-function processCountForSystem(systemId) {
-  return visibleArticles('process').filter(article => article.system === systemId).length;
-}
-
-function processModulesForSystem(systemId) {
-  const explicit = (db.processModules || []).filter(module => module.system === systemId).map(module => module.name);
-  const fromArticles = visibleArticles('process').filter(article => article.system === systemId).map(article => article.module || 'Geral');
-  return [...new Set([...explicit, ...fromArticles])].filter(Boolean).sort((a, b) => a.localeCompare(b));
-}
-
-function processArticlesForModule(systemId, moduleName) {
-  return visibleArticles('process')
-    .filter(article => article.system === systemId && (article.module || 'Geral') === moduleName)
-    .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-}
-
-function selectProcessSystem(id) {
-  selectedProcessSystem = id;
-  selectedProcessModule = '';
-  renderProcesses();
-}
-
-function selectProcessModule(moduleName) {
-  selectedProcessModule = moduleName;
-  renderProcesses();
-}
-
-function backToProcessSystems() {
-  selectedProcessSystem = '';
-  selectedProcessModule = '';
-  renderProcesses();
-}
-
-function backToProcessModules() {
-  selectedProcessModule = '';
-  renderProcesses();
-}
-
-async function createProcessModule() {
-  if (!isAdmin()) return alert('Apenas administradores podem criar módulos.');
-  if (!selectedProcessSystem) return alert('Selecione um sistema antes de criar o módulo.');
-
-  const system = db.systems.find(item => item.id === selectedProcessSystem);
-  const name = prompt(`Nome do novo módulo para ${system?.name || 'este sistema'}:`);
-  if (!name?.trim()) return;
-
-  const cleanName = name.trim();
-  const exists = processModulesForSystem(selectedProcessSystem).some(module => module.toLowerCase() === cleanName.toLowerCase());
-  if (exists) return alert('Este módulo já existe neste sistema.');
-
-  const payload = {
-    id: crypto.randomUUID(),
-    system: selectedProcessSystem,
-    name: cleanName,
-    createdAt: new Date().toLocaleDateString('pt-BR')
-  };
-
-  db.processModules.unshift(payload);
-  saveDb();
-  await upsertSupabase('modulos_processos', payload);
-  renderProcesses();
-}
-
-function newProcessInSelectedModule() {
-  if (!selectedProcessSystem || !selectedProcessModule) {
-    newArticle('process');
-    return;
-  }
-
-  newArticle('process');
-  if ($('formSystem')) $('formSystem').value = selectedProcessSystem;
-  if ($('formModule')) $('formModule').value = selectedProcessModule;
-}
-
 function renderProcesses() {
   const board = $('processBoard');
   const list = $('processList');
+  const actions = $('processFlowActions');
   if (!board || !list) return;
 
+  const processes = visibleArticles('process');
+  const systemsWithProcesses = db.systems.filter(s => processes.some(a => a.system === s.id));
+
+  if (actions) actions.innerHTML = selectedProcessSystem
+    ? `<button class="ghost-btn" onclick="selectedProcessSystem=''; renderProcesses();">← Voltar para sistemas</button>`
+    : '';
+
   if (!selectedProcessSystem) {
-    board.innerHTML = `
-      <div class="process-flow-heading">
-        <span class="process-step active">1. Sistemas</span>
-        <span class="process-step">2. Módulos</span>
-        <span class="process-step">3. Artigos</span>
-      </div>
-      <div class="process-system-grid">
-        ${db.systems.map(system => `
-          <button class="process-system-tile" type="button" onclick="selectProcessSystem('${system.id}')">
-            <span>Sistema</span>
-            <strong>${system.name}</strong>
-            <small>${processCountForSystem(system.id)} processo(s)</small>
-          </button>
-        `).join('')}
-      </div>
-    `;
+    board.innerHTML = systemsWithProcesses.length ? systemsWithProcesses.map(s => {
+      const count = processes.filter(a => a.system === s.id).length;
+      const moduleCount = [...new Set(processes.filter(a => a.system === s.id).map(a => a.module || 'sem-modulo'))].length;
+      return `<button class="process-system-card" onclick="selectedProcessSystem='${s.id}'; renderProcesses();">
+        <strong>${s.name}</strong>
+        <span>${moduleCount} módulos • ${count} artigos</span>
+      </button>`;
+    }).join('') : '<div class="panel"><p class="muted">Nenhum processo interno cadastrado ainda.</p></div>';
     list.innerHTML = '';
     return;
   }
 
-  const system = db.systems.find(item => item.id === selectedProcessSystem);
-  const modules = processModulesForSystem(selectedProcessSystem);
+  const system = db.systems.find(s => s.id === selectedProcessSystem);
+  const systemProcesses = processes.filter(a => a.system === selectedProcessSystem);
+  const modulesWithArticles = modulesBySystem(selectedProcessSystem).filter(m => systemProcesses.some(a => a.module === m.id));
+  const orphanProcesses = systemProcesses.filter(a => !a.module || !modulesWithArticles.some(m => m.id === a.module));
 
-  if (!selectedProcessModule) {
-    board.innerHTML = `
-      <div class="process-flow-heading">
-        <button class="ghost-btn" type="button" onclick="backToProcessSystems()">← Voltar para sistemas</button>
-        <span class="process-step done">1. ${system?.name || 'Sistema'}</span>
-        <span class="process-step active">2. Módulos</span>
-        <span class="process-step">3. Artigos</span>
-        ${isAdmin() ? `<button class="primary-btn" type="button" onclick="createProcessModule()">+ Criar módulo</button>` : ''}
-      </div>
-      <div class="process-module-grid">
-        ${modules.length ? modules.map(moduleName => `
-          <button class="process-module-tile" type="button" onclick="selectProcessModule('${moduleName.replace(/'/g, "\\'")}')">
-            <span>Módulo</span>
-            <strong>${moduleName}</strong>
-            <small>${processArticlesForModule(selectedProcessSystem, moduleName).length} artigo(s)</small>
-          </button>
-        `).join('') : `<div class="panel"><p class="muted">Nenhum módulo criado para ${system?.name || 'este sistema'}.</p>${isAdmin() ? `<button class="primary-btn" type="button" onclick="createProcessModule()">Criar primeiro módulo</button>` : ''}</div>`}
-      </div>
-    `;
-    list.innerHTML = '';
-    return;
-  }
-
-  const moduleArticles = processArticlesForModule(selectedProcessSystem, selectedProcessModule);
-  board.innerHTML = `
-    <div class="process-flow-heading">
-      <button class="ghost-btn" type="button" onclick="backToProcessModules()">← Voltar para módulos</button>
-      <span class="process-step done">1. ${system?.name || 'Sistema'}</span>
-      <span class="process-step done">2. ${selectedProcessModule}</span>
-      <span class="process-step active">3. Artigos</span>
-      ${canSeeInternalProcesses() ? `<button class="primary-btn" type="button" onclick="newProcessInSelectedModule()">+ Criar artigo neste módulo</button>` : ''}
+  board.innerHTML = `<div class="process-selected-system"><h3>${system?.name || 'Sistema'}</h3><p>Selecione um módulo para visualizar os artigos vinculados.</p></div>`;
+  list.innerHTML = modulesWithArticles.length || orphanProcesses.length ? `
+    <div class="module-accordion">
+      ${modulesWithArticles.map(m => {
+        const articles = systemProcesses.filter(a => a.module === m.id);
+        return `<details class="module-group" open>
+          <summary><strong>${m.name}</strong><span>${articles.length} artigos</span></summary>
+          <div class="module-articles">
+            ${articles.map(a => `<article class="module-article-row" onclick="openArticle('${a.id}')">
+              <div><strong>${a.title}</strong><p>${a.summary}</p></div>
+              <div class="article-actions">
+                <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${a.id}')">Abrir</button>
+                ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${a.id}')">Editar</button>` : ''}
+                ${isAdmin() ? `<button class="danger-btn" onclick="event.stopPropagation(); deleteArticle('${a.id}')">Excluir</button>` : ''}
+              </div>
+            </article>`).join('')}
+          </div>
+        </details>`;
+      }).join('')}
+      ${orphanProcesses.length ? `<details class="module-group" open><summary><strong>Sem módulo vinculado</strong><span>${orphanProcesses.length} artigos</span></summary><div class="module-articles">${orphanProcesses.map(a => `<article class="module-article-row" onclick="openArticle('${a.id}')"><div><strong>${a.title}</strong><p>${a.summary}</p></div><button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${a.id}')">Vincular módulo</button></article>`).join('')}</div></details>` : ''}
     </div>
-  `;
-
-  list.innerHTML = moduleArticles.length ? moduleArticles.map(article => `
-    <article class="process-article-card" onclick="openArticle('${article.id}')">
-      <div>
-        <strong>${article.title}</strong>
-        <p>${article.summary}</p>
-        <div class="meta"><span class="tag">${systemName(article.system)}</span><span class="tag">${article.module || 'Geral'}</span><span class="tag status ${article.status}">${article.status}</span></div>
-      </div>
-      <div class="process-actions" onclick="event.stopPropagation()">
-        <button class="ghost-btn" onclick="openArticle('${article.id}')">Abrir</button>
-        ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="editArticle('${article.id}')">Editar</button>` : ''}
-        ${isAdmin() ? `<button class="danger-btn" onclick="deleteArticle('${article.id}')">Excluir</button>` : ''}
-      </div>
-    </article>
-  `).join('') : `<div class="panel"><p class="muted">Nenhum artigo vinculado ao módulo ${selectedProcessModule}.</p>${canSeeInternalProcesses() ? `<button class="primary-btn" type="button" onclick="newProcessInSelectedModule()">Criar primeiro artigo</button>` : ''}</div>`;
+  ` : '<div class="panel"><p class="muted">Este sistema ainda não possui módulos com artigos vinculados.</p></div>';
 }
 
 function saveBanner() {
@@ -1159,36 +931,18 @@ saveArticle = async function() {
 
 
 document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.page)));
-
-$('loginBtn').addEventListener('click', async () => {
+$('loginBtn').addEventListener('click', () => {
   if (currentUser) {
-    await logoutSupabase();
+    currentUser = null;
+    localStorage.removeItem('dynamicdoc-user');
+    refresh();
+    navigate('home');
     return;
   }
   $('loginPanel').classList.remove('hidden');
 });
-
 $('closeLogin').addEventListener('click', () => $('loginPanel').classList.add('hidden'));
 
-if ($('forgotPasswordBtn')) {
-  $('forgotPasswordBtn').addEventListener('click', async () => {
-    const email = $('loginEmail').value.trim();
-    if (!email) return alert('Informe seu e-mail para redefinir a senha.');
-    await resetPasswordSupabase(email);
-  });
-}
-
-if ($('confirmLogin')) {
-  $('confirmLogin').addEventListener('click', async () => {
-    const email = $('loginEmail').value.trim();
-    const password = $('loginPassword').value.trim();
-
-    if (!email || !password) return alert('Preencha e-mail e senha.');
-
-    const ok = await loginWithSupabase(email, password);
-    if (ok) $('loginPanel').classList.add('hidden');
-  });
-}
 
 document.querySelectorAll('.access-tab').forEach(btn => btn.addEventListener('click', () => {
   document.querySelectorAll('.access-tab').forEach(tab => tab.classList.remove('active'));
@@ -1197,45 +951,63 @@ document.querySelectorAll('.access-tab').forEach(btn => btn.addEventListener('cl
   $(btn.dataset.accessTab).classList.add('active-access-box');
 }));
 
-if ($('accessLoginBtn')) {
-  $('accessLoginBtn').addEventListener('click', async () => {
-    const email = $('accessEmail').value.trim();
-    const password = $('accessPassword').value.trim();
-    if (!email || !password) return alert('Preencha e-mail e senha para acessar.');
-    await loginWithSupabase(email, password);
-  });
+$('accessLoginBtn').addEventListener('click', () => {
+  const email = $('accessEmail').value.trim();
+  const role = $('accessRole').value;
+  const department = $('accessDepartment').value;
+  if (!email || !$('accessPassword').value.trim()) return alert('Preencha e-mail e senha para acessar.');
+  currentUser = {
+    name: email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    email,
+    role,
+    department
+  };
+  saveUser();
+  async function startDynamicDoc() {
+  await loadSupabaseData();
+  refresh();
+  navigate(document.querySelector('.page.active-page')?.id || 'home');
 }
 
-if ($('recoverBtn')) {
-  $('recoverBtn').addEventListener('click', async () => {
-    const email = $('recoverEmail').value.trim();
-    if (!email) return alert('Informe o e-mail cadastrado.');
-    await resetPasswordSupabase(email);
-    $('recoverMessage').classList.remove('hidden');
-  });
+startDynamicDoc();
+  navigate('home');
+});
+
+$('recoverBtn').addEventListener('click', () => {
+  if (!$('recoverEmail').value.trim()) return alert('Informe o e-mail cadastrado.');
+  $('recoverMessage').classList.remove('hidden');
+});
+
+$('requestAccessBtn').addEventListener('click', async () => {
+  const name = $('requestName').value.trim();
+  const email = $('requestEmail').value.trim();
+  const company = $('requestCompany').value.trim();
+  if (!name || !email || !company) return alert('Preencha nome, e-mail corporativo e empresa.');
+  const payload = { id: crypto.randomUUID(), name, email, company, role: 'usuário comum' };
+  db.clients.unshift(payload);
+  saveDb();
+  await upsertSupabase('clientes', payload);
+  renderClients();
+  $('requestMessage').classList.remove('hidden');
+  ['requestName','requestEmail','requestCompany','requestReason'].forEach(id => $(id).value = '');
+});
+
+$('confirmLogin').addEventListener('click', () => {
+  currentUser = {
+    name: $('loginName').value.trim() || 'Usuário Dynamic',
+    role: $('loginRole').value,
+    department: $('loginDepartment').value
+  };
+  saveUser();
+  $('loginPanel').classList.add('hidden');
+  async function startDynamicDoc() {
+  await loadSupabaseData();
+  refresh();
+  navigate(document.querySelector('.page.active-page')?.id || 'home');
 }
 
-if ($('requestAccessBtn')) {
-  $('requestAccessBtn').addEventListener('click', async () => {
-    const name = $('requestName').value.trim();
-    const email = $('requestEmail').value.trim();
-    const company = $('requestCompany').value.trim();
-    const department = $('requestDepartment').value;
-    if (!name || !email || !company) return alert('Preencha nome, e-mail corporativo e empresa.');
-    const payload = { id: crypto.randomUUID(), name, email, company, role: 'usuário comum', department };
-    db.clients.unshift(payload);
-    saveDb();
-    await upsertSupabase('clientes', payload);
-    renderClients();
-    $('requestMessage').classList.remove('hidden');
-    ['requestName','requestEmail','requestCompany','requestReason'].forEach(id => { if ($(id)) $(id).value = ''; });
-  });
-}
-
-async function resetPassword(type, email) {
-  await resetPasswordSupabase(email);
-}
-
+startDynamicDoc();
+});
 $('closeArticle').addEventListener('click', closeArticleModal);
 $('articleModal').addEventListener('click', (event) => {
   if (event.target.id === 'articleModal') closeArticleModal();
@@ -1256,6 +1028,8 @@ $('newProcessBtn').addEventListener('click', () => newArticle('process'));
 $('backToArticlesBtn').addEventListener('click', () => navigate(editorReturnPage || 'articles'));
 $('saveArticle').addEventListener('click', saveArticle);
 $('clearArticleForm').addEventListener('click', clearForm);
+if ($('formSystem')) $('formSystem').addEventListener('change', () => updateModuleSelect());
+if ($('addModuleBtn')) $('addModuleBtn').addEventListener('click', addModule);
 
 document.querySelectorAll('.doc-toolbar button').forEach(button => {
   button.addEventListener('click', () => {
@@ -1271,15 +1045,9 @@ document.querySelectorAll('.doc-toolbar button').forEach(button => {
 
 async function startDynamicDoc() {
   await loadSupabaseData();
-
-  if (supabaseDb) {
-    currentUser = await getLoggedUser();
-    if (currentUser) saveUser();
-    else localStorage.removeItem('dynamicdoc-user');
-  }
-
   refresh();
   navigate(document.querySelector('.page.active-page')?.id || 'home');
 }
 
 startDynamicDoc();
+
