@@ -13,7 +13,7 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">D</div>
+        <div class="brand-mark"><img src="logo-dynamicdoc.png" alt="DynamicDoc" onerror="this.style.display='none'; this.parentElement.textContent='D';"></div>
         <div>
           <h1>DynamicDoc</h1>
           <p>Portal de Conhecimento</p>
@@ -55,15 +55,21 @@
           <button class="close-btn" id="closeLogin">×</button>
           <h2>Acessar DynamicDoc</h2>
           <p>Acesso restrito para usuários corporativos e administradores.</p>
-
-          <label>E-mail</label>
-          <input id="loginEmail" type="email" placeholder="nome@dynamictravel.com.br" autocomplete="email" />
-
-          <label>Senha</label>
-          <input id="loginPassword" type="password" placeholder="Digite sua senha" autocomplete="current-password" />
-
+          <label>Nome</label>
+          <input id="loginName" type="text" placeholder="Ex: Luiza Saraiva" />
+          <label>Perfil</label>
+          <select id="loginRole">
+            <option value="colaborador">Usuário corporativo</option>
+            <option value="admin">Administrador</option>
+          </select>
+          <label>Departamento</label>
+          <select id="loginDepartment">
+            <option>Suporte</option>
+            <option>Financeiro</option>
+            <option>Eventos</option>
+            <option>Operação</option>
+          </select>
           <button class="primary-btn full" id="confirmLogin">Entrar no portal</button>
-          <button class="ghost-btn full" id="forgotPasswordBtn" style="margin-top:10px;">Esqueci minha senha</button>
         </div>
       </section>
 
@@ -235,12 +241,14 @@
               <select id="formSystem"></select>
             </div>
             <div>
-              <label>Departamento</label>
-              <select id="formDepartment"></select>
+              <label>Módulo</label>
+              <select id="formModule">
+                <option value="">Selecione um sistema primeiro</option>
+              </select>
             </div>
             <div>
-              <label>Módulo</label>
-              <input id="formModule" type="text" placeholder="Ex: Cadastros, Aprovações, Emissão" />
+              <label>Departamento</label>
+              <select id="formDepartment"></select>
             </div>
           </div>
 
@@ -320,6 +328,21 @@
           <button class="primary-btn staff-only" id="newProcessBtn">+ Criar processo interno</button>
         </div>
 
+        <div class="panel module-admin-panel admin-only">
+          <div class="panel-header">
+            <div>
+              <h3>Cadastrar módulo</h3>
+              <p class="muted">Crie módulos previamente e vincule os artigos a eles no cadastro/edição.</p>
+            </div>
+          </div>
+          <div class="mini-form module-form">
+            <select id="newModuleSystem"></select>
+            <input id="newModuleName" type="text" placeholder="Nome do módulo. Ex: Cadastros" />
+            <button class="primary-btn" id="addModuleBtn">+ Criar módulo</button>
+          </div>
+        </div>
+
+        <div class="process-flow-actions" id="processFlowActions"></div>
         <div class="process-board" id="processBoard"></div>
         <div class="article-list simple-process-list" id="processList"></div>
       </section>
@@ -400,11 +423,10 @@
                 <option>Operação</option>
               </select>
               <select id="agencyAccess">
-                <option value="colaborador">Usuário corporativo</option>
+                <option value="usuario corporativo">Usuário corporativo</option>
                 <option value="colaborador">Colaborador</option>
-                <option value="admin">Administrador</option>
+                <option value="administrador">Administrador</option>
               </select>
-              <input id="agencyPassword" type="password" placeholder="Senha temporária" />
               <button class="primary-btn" id="addAgencyUser">+ Cadastrar usuário</button>
             </div>
             <div class="table-wrap">
