@@ -911,59 +911,129 @@ function openArticle(id) {
   $('articleModal').classList.remove('hidden');
 }
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function processMatchesSearch(article, module, system, query) {
+  if (!query) return true;
+  const text = `${article.title || ''} ${article.summary || ''} ${article.content || ''} ${(article.tags || []).join(' ')} ${module?.name || ''} ${system?.name || ''}`.toLowerCase();
+  return text.includes(query);
+}
+
 function renderProcesses() {
   const board = $('processBoard');
   const list = $('processList');
   const actions = $('processFlowActions');
+  const searchInput = $('processSearch');
   if (!board || !list) return;
 
-  const processes = visibleArticles('process');
-  const systemsWithProcesses = db.systems.filter(s => processes.some(a => a.system === s.id));
+  if (actions) actions.innerHTML = '';
+  list.innerHTML = '';
 
-  if (actions) actions.innerHTML = selectedProcessSystem
-    ? `<button class="ghost-btn" onclick="selectedProcessSystem=''; renderProcesses();">← Voltar para sistemas</button>`
-    : '';
+  const query = (searchInput?.value || '').trim().toLowerCase();
+  const allProcesses = visibleArticles('process');
 
-  if (!selectedProcessSystem) {
-    board.innerHTML = systemsWithProcesses.length ? systemsWithProcesses.map(s => {
-      const count = processes.filter(a => a.system === s.id).length;
-      const moduleCount = [...new Set(processes.filter(a => a.system === s.id).map(a => a.module || 'sem-modulo'))].length;
-      return `<button class="process-system-card" onclick="selectedProcessSystem='${s.id}'; renderProcesses();">
-        <strong>${s.name}</strong>
-        <span>${moduleCount} módulos • ${count} artigos</span>
-      </button>`;
-    }).join('') : '<div class="panel"><p class="muted">Nenhum processo interno cadastrado ainda.</p></div>';
-    list.innerHTML = '';
-    return;
-  }
+  const systemsHtml = db.systems.map(system => {
+    const systemProcesses = allProcesses.filter(article => article.system === system.id);
+    if (!systemProcesses.length) return '';
 
-  const system = db.systems.find(s => s.id === selectedProcessSystem);
-  const systemProcesses = processes.filter(a => a.system === selectedProcessSystem);
-  const modulesWithArticles = modulesBySystem(selectedProcessSystem).filter(m => systemProcesses.some(a => a.module === m.id));
-  const orphanProcesses = systemProcesses.filter(a => !a.module || !modulesWithArticles.some(m => m.id === a.module));
+    const modulesWithArticles = modulesBySystem(system.id)
+      .map(module => {
+        const articles = systemProcesses.filter(article => article.module === module.id && processMatchesSearch(article, module, system, query));
+        return { module, articles };
+      })
+      .filter(group => group.articles.length > 0);
 
-  board.innerHTML = `<div class="process-selected-system"><h3>${system?.name || 'Sistema'}</h3><p>Selecione um módulo para visualizar os artigos vinculados.</p></div>`;
-  list.innerHTML = modulesWithArticles.length || orphanProcesses.length ? `
-    <div class="module-accordion">
-      ${modulesWithArticles.map(m => {
-        const articles = systemProcesses.filter(a => a.module === m.id);
-        return `<details class="module-group" open>
-          <summary><strong>${m.name}</strong><span>${articles.length} artigos</span></summary>
-          <div class="module-articles">
-            ${articles.map(a => `<article class="module-article-row" onclick="openArticle('${a.id}')">
-              <div><strong>${a.title}</strong><p>${a.summary}</p></div>
-              <div class="article-actions">
-                <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${a.id}')">Abrir</button>
-                ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${a.id}')">Editar</button>` : ''}
-                ${isAdmin() ? `<button class="danger-btn" onclick="event.stopPropagation(); deleteArticle('${a.id}')">Excluir</button>` : ''}
-              </div>
-            </article>`).join('')}
+    const orphanArticles = systemProcesses.filter(article => {
+      const hasModule = article.module && modulesBySystem(system.id).some(module => module.id === article.module);
+      return !hasModule && processMatchesSearch(article, { name: 'Sem módulo' }, system, query);
+    });
+
+    if (!modulesWithArticles.length && !orphanArticles.length) return '';
+
+    const articleCount = modulesWithArticles.reduce((total, group) => total + group.articles.length, 0) + orphanArticles.length;
+    const moduleCount = modulesWithArticles.length + (orphanArticles.length ? 1 : 0);
+    const openAttr = query ? ' open' : '';
+
+    return `
+      <details class="process-system-group"${openAttr}>
+        <summary class="process-system-summary">
+          <div>
+            <strong>${escapeHtml(system.name)}</strong>
+            <span>${moduleCount} módulos • ${articleCount} artigos</span>
           </div>
-        </details>`;
-      }).join('')}
-      ${orphanProcesses.length ? `<details class="module-group" open><summary><strong>Sem módulo vinculado</strong><span>${orphanProcesses.length} artigos</span></summary><div class="module-articles">${orphanProcesses.map(a => `<article class="module-article-row" onclick="openArticle('${a.id}')"><div><strong>${a.title}</strong><p>${a.summary}</p></div><button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${a.id}')">Vincular módulo</button></article>`).join('')}</div></details>` : ''}
-    </div>
-  ` : '<div class="panel"><p class="muted">Este sistema ainda não possui módulos com artigos vinculados.</p></div>';
+          <span class="process-chevron">▾</span>
+        </summary>
+        <div class="process-modules-wrap">
+          ${modulesWithArticles.map(({ module, articles }) => `
+            <details class="process-module-group"${openAttr}>
+              <summary class="process-module-summary">
+                <div>
+                  <strong>${escapeHtml(module.name)}</strong>
+                  <span>${articles.length} artigos vinculados</span>
+                </div>
+                <span class="process-chevron">▾</span>
+              </summary>
+              <div class="process-article-list">
+                ${articles.map(article => `
+                  <article class="process-article-row" onclick="openArticle('${article.id}')">
+                    <div>
+                      <strong>${escapeHtml(article.title)}</strong>
+                      <p>${escapeHtml(article.summary || 'Sem resumo cadastrado.')}</p>
+                      <div class="meta">
+                        <span class="tag">${escapeHtml(systemName(article.system))}</span>
+                        <span class="tag">${escapeHtml(moduleName(article.module))}</span>
+                        <span class="tag status ${article.status}">${escapeHtml(article.status || 'publicado')}</span>
+                      </div>
+                    </div>
+                    <div class="article-actions">
+                      <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${article.id}')">Abrir</button>
+                      ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${article.id}')">Editar</button>` : ''}
+                      ${isAdmin() ? `<button class="danger-btn" onclick="event.stopPropagation(); deleteArticle('${article.id}')">Excluir</button>` : ''}
+                    </div>
+                  </article>
+                `).join('')}
+              </div>
+            </details>
+          `).join('')}
+          ${orphanArticles.length ? `
+            <details class="process-module-group"${openAttr}>
+              <summary class="process-module-summary">
+                <div>
+                  <strong>Sem módulo vinculado</strong>
+                  <span>${orphanArticles.length} artigos vinculados</span>
+                </div>
+                <span class="process-chevron">▾</span>
+              </summary>
+              <div class="process-article-list">
+                ${orphanArticles.map(article => `
+                  <article class="process-article-row" onclick="openArticle('${article.id}')">
+                    <div>
+                      <strong>${escapeHtml(article.title)}</strong>
+                      <p>${escapeHtml(article.summary || 'Sem resumo cadastrado.')}</p>
+                    </div>
+                    <div class="article-actions">
+                      <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${article.id}')">Abrir</button>
+                      ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${article.id}')">Vincular módulo</button>` : ''}
+                      ${isAdmin() ? `<button class="danger-btn" onclick="event.stopPropagation(); deleteArticle('${article.id}')">Excluir</button>` : ''}
+                    </div>
+                  </article>
+                `).join('')}
+              </div>
+            </details>
+          ` : ''}
+        </div>
+      </details>
+    `;
+  }).join('');
+
+  board.innerHTML = systemsHtml.trim() || `<div class="panel"><p class="muted">${query ? 'Nenhum processo encontrado para a pesquisa.' : 'Nenhum processo interno cadastrado ainda.'}</p></div>`;
 }
 
 function saveBanner() {
@@ -1098,6 +1168,7 @@ $('saveArticle').addEventListener('click', saveArticle);
 $('clearArticleForm').addEventListener('click', clearForm);
 if ($('formSystem')) $('formSystem').addEventListener('change', () => updateModuleSelect());
 if ($('addModuleBtn')) $('addModuleBtn').addEventListener('click', addModule);
+if ($('processSearch')) $('processSearch').addEventListener('input', renderProcesses);
 
 document.querySelectorAll('.doc-toolbar button').forEach(button => {
   button.addEventListener('click', () => {
