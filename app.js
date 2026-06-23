@@ -54,20 +54,82 @@ const isAdmin = () => currentUser?.role === 'admin';
 const roleLabel = (role) => ({usuario:'Usuário',colaborador:'Colaborador',gestor:'Gestor de Conteúdo',admin:'Administrador'}[role] || 'Visitante');
 const normalize = (v) => (v || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
+async function fetchTable(table, select='*'){
+  if(!supabaseDb) return {data:null,error:null};
+  try { return await supabaseDb.from(table).select(select); }
+  catch(e){ return {data:null,error:{message:e.message}}; }
+}
+
+function normalizeArticle(a){
+  return {
+    ...a,
+    id: a.id || uid(),
+    kind: a.kind || 'article',
+    visibility: a.visibility || (a.kind === 'process' ? 'interno' : 'publico'),
+    status: a.status || 'publicado',
+    module: a.module || a.module_id || '',
+    department: a.department || a.departamento || 'suporte',
+    tags: Array.isArray(a.tags) ? a.tags : [],
+    comments: Array.isArray(a.comments) ? a.comments : [],
+    versions: Array.isArray(a.versions) ? a.versions : [],
+    internalNote: a.internalNote || a.internal_note || '',
+    file: a.file || '',
+    version: a.version || '1.0',
+    views: Number(a.views || 0),
+    likes: Number(a.likes || 0),
+    dislikes: Number(a.dislikes || 0),
+    createdAt: a.createdAt || a.created_at || nowBR(),
+    updatedAt: a.updatedAt || a.updated_at || nowBR()
+  };
+}
+
+function normalizeModule(m){
+  return { id: m.id, system: m.system || m.sistema, name: m.name || m.nome };
+}
+
+function normalizeProfile(x){
+  return {id:x.id || uid(), name:x.name||x.nome||x.email, email:x.email, role:x.role||x.perfil||x.access||'colaborador', department:x.department||x.departamento||'suporte'};
+}
+
 async function syncFromSupabase(){
   if(!supabaseDb) return;
   try{
-    const [a,s,m,u,t] = await Promise.all([
-      supabaseDb.from('articles').select('*'), supabaseDb.from('systems').select('*'), supabaseDb.from('modules').select('*'), supabaseDb.from('profiles').select('*'), supabaseDb.from('training_tracks').select('*')
+    // Compatível com a base antiga do DynamicDoc: artigos, modulos, profiles.
+    // Se a tabela nova existir, também funciona; mas prioriza artigos para não perder os conteúdos já cadastrados.
+    const [artigosRes, articlesRes, sistemasRes, systemsRes, modulosRes, modulesRes, profilesRes, tracksRes] = await Promise.all([
+      fetchTable('artigos'),
+      fetchTable('articles'),
+      fetchTable('sistemas'),
+      fetchTable('systems'),
+      fetchTable('modulos'),
+      fetchTable('modules'),
+      fetchTable('profiles'),
+      fetchTable('training_tracks')
     ]);
-    if(a.data?.length) db.articles = a.data.map(x=>({...x,tags:x.tags||[],comments:x.comments||[],versions:x.versions||[]}));
-    if(s.data?.length) db.systems = s.data;
-    if(m.data?.length) db.modules = m.data;
-    if(u.data?.length) db.users = u.data.map(x=>({id:x.id,name:x.name||x.nome,email:x.email,role:x.role||x.perfil,department:x.department||x.departamento}));
-    if(t.data?.length) db.tracks = t.data.map(x=>({...x,lessons:x.lessons||[]}));
+
+    const artigosData = artigosRes.data?.length ? artigosRes.data : articlesRes.data;
+    if(artigosData?.length) db.articles = artigosData.map(normalizeArticle);
+
+    const sistemasData = sistemasRes.data?.length ? sistemasRes.data : systemsRes.data;
+    if(sistemasData?.length) db.systems = sistemasData.map(s=>({id:s.id, name:s.name||s.nome, description:s.description||s.descricao||''}));
+
+    const modulosData = modulosRes.data?.length ? modulosRes.data : modulesRes.data;
+    if(modulosData?.length) db.modules = modulosData.map(normalizeModule);
+
+    if(profilesRes.data?.length) db.users = profilesRes.data.map(normalizeProfile);
+    if(tracksRes.data?.length) db.tracks = tracksRes.data.map(x=>({...x,lessons:x.lessons||[]}));
+
     saveDb();
-  }catch(e){console.warn('Supabase offline/local:', e.message)}
+  }catch(e){
+    console.warn('Supabase offline/local:', e.message);
+  }
 }
+
+const ARTICLE_TABLE = 'artigos';
+const MODULE_TABLE = 'modulos';
+const SYSTEM_TABLE = 'systems';
+const PROFILE_TABLE = 'profiles';
+
 async function upsert(table,payload){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).upsert(payload); if(error) console.warn(error.message); }
 async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
 
@@ -145,12 +207,12 @@ function articleCard(a){
 
 function openArticle(id){
   const a=db.articles.find(x=>x.id===id); if(!a) return;
-  a.views=(a.views||0)+1; db.history=[id,...db.history.filter(x=>x!==id)].slice(0,12); saveDb(); upsert('articles',a);
+  a.views=(a.views||0)+1; db.history=[id,...db.history.filter(x=>x!==id)].slice(0,12); saveDb(); upsert(ARTICLE_TABLE, a);
   $('articleModalBody').innerHTML = `<div class="modal-body"><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h1>${a.title}</h1><p class="muted">${a.summary||''}</p>${a.image?`<img class="content-media" src="${a.image}" alt="Imagem do artigo">`:''}${a.video?`<video class="content-media" src="${a.video}" controls></video>`:''}<div class="content-text">${(a.content||'').split('\n').map(p=>`<p>${p}</p>`).join('')}</div>${a.file?`<p><a class="primary-btn" href="${a.file}" target="_blank">Abrir arquivo</a></p>`:''}${isStaff()&&a.internalNote?`<div class="comment-box"><strong>Observação interna</strong><p>${a.internalNote}</p></div>`:''}<div class="comment-box"><strong>Comentários internos</strong><div>${(a.comments||[]).map(c=>`<p><b>${c.author}</b> • ${c.date}<br>${c.text}</p>`).join('')||'<p class="muted">Nenhum comentário.</p>'}</div>${isStaff()?`<textarea id="newComment" rows="2" placeholder="Adicionar comentário interno"></textarea><button class="primary-btn" onclick="addComment('${a.id}')">Comentar</button>`:''}</div><div class="article-actions"><button class="small-btn" onclick="rateArticle('${a.id}','likes')">👍 ${a.likes||0}</button><button class="small-btn" onclick="rateArticle('${a.id}','dislikes')">👎 ${a.dislikes||0}</button></div></div>`;
   $('articleModal').classList.remove('hidden');
 }
-function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:currentUser?.name||'Colaborador',date:nowBR(),text}); saveDb(); upsert('articles',a); openArticle(id);}
-function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsert('articles',a); openArticle(id);}
+function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:currentUser?.name||'Colaborador',date:nowBR(),text}); saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
+function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
 function toggleFavorite(id){db.favorites=db.favorites.includes(id)?db.favorites.filter(x=>x!==id):[id,...db.favorites]; saveDb(); renderAll();}
 
 function newContent(kind='article'){ if(!canManageContent()) return alert('Apenas gestores de conteúdo e administradores podem criar.'); selectedArticleId=null; editorReturnPage=kind==='process'?'processes':'articles'; clearEditor(kind); navigate('articleEditor'); }
@@ -163,10 +225,10 @@ function saveArticle(){
   const nextVersion = old ? (parseFloat(old.version||'1.0')+0.1).toFixed(1) : '1.0';
   const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').value.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image:$('articleImage').value.trim(), video:$('articleVideo').value.trim(), file:$('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
   if(!article.title) return alert('Informe o título.');
-  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); upsert('articles',article); navigate(editorReturnPage);
+  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); upsert(ARTICLE_TABLE, article); navigate(editorReturnPage);
 }
-function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsert('articles',copy); navigate(editorReturnPage); }
-function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote('articles',id); renderAll(); }
+function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsert(ARTICLE_TABLE, copy); navigate(editorReturnPage); }
+function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote(ARTICLE_TABLE, id); renderAll(); }
 
 function renderFavorites(){
   const favs=db.favorites.map(id=>db.articles.find(a=>a.id===id)).filter(Boolean); const hist=db.history.map(id=>db.articles.find(a=>a.id===id)).filter(Boolean);
@@ -186,10 +248,10 @@ function renderAdmin(){
   $('searchMetrics').innerHTML=(db.searchLogs.slice(0,10).map(s=>`<div class="metric-row"><span>${s.query}</span><small>${s.date}</small></div>`).join('')||'<p class="muted">Nenhuma busca registrada.</p>') + `<h4>Mais acessados</h4>${top.map(a=>`<div class="metric-row"><span>${a.title}</span><b>${a.views||0}</b></div>`).join('')}`;
   $('versionsList').innerHTML=db.articles.map(a=>`<div class="version-item"><span><b>${a.title}</b><br><small>Versão atual: ${a.version||'1.0'} • anteriores: ${(a.versions||[]).length}</small></span><button class="small-btn" onclick="editArticle('${a.id}')">Editar</button></div>`).join('');
 }
-function addUser(){const u={id:uid(),name:$('userName').value.trim(),email:$('userEmail').value.trim(),role:$('userRole').value,department:$('userDepartment').value}; if(!u.name||!u.email) return alert('Preencha nome e e-mail.'); db.users.unshift(u); saveDb(); upsert('profiles',u); ['userName','userEmail'].forEach(id=>$(id).value=''); renderAdmin();}
-function removeUser(id){db.users=db.users.filter(u=>u.id!==id); saveDb(); removeRemote('profiles',id); renderAdmin();}
-function addSystem(){const name=$('newSystemName').value.trim(); if(!name) return; const s={id:normalize(name).replaceAll(' ','-'),name,description:'Sistema cadastrado pela administração.'}; db.systems.push(s); saveDb(); upsert('systems',s); $('newSystemName').value=''; renderAll();}
-function addModule(){const name=$('newModuleName').value.trim(); if(!name) return; const m={id:normalize($('moduleSystem').value+'-'+name).replaceAll(' ','-'),system:$('moduleSystem').value,name}; db.modules.push(m); saveDb(); upsert('modules',m); $('newModuleName').value=''; renderAll();}
+function addUser(){const u={id:uid(),name:$('userName').value.trim(),email:$('userEmail').value.trim(),role:$('userRole').value,department:$('userDepartment').value}; if(!u.name||!u.email) return alert('Preencha nome e e-mail.'); db.users.unshift(u); saveDb(); upsert(PROFILE_TABLE, u); ['userName','userEmail'].forEach(id=>$(id).value=''); renderAdmin();}
+function removeUser(id){db.users=db.users.filter(u=>u.id!==id); saveDb(); removeRemote(PROFILE_TABLE, id); renderAdmin();}
+function addSystem(){const name=$('newSystemName').value.trim(); if(!name) return; const s={id:normalize(name).replaceAll(' ','-'),name,description:'Sistema cadastrado pela administração.'}; db.systems.push(s); saveDb(); upsert(SYSTEM_TABLE, s); $('newSystemName').value=''; renderAll();}
+function addModule(){const name=$('newModuleName').value.trim(); if(!name) return; const m={id:normalize($('moduleSystem').value+'-'+name).replaceAll(' ','-'),system:$('moduleSystem').value,name}; db.modules.push(m); saveDb(); upsert(MODULE_TABLE, m); $('newModuleName').value=''; renderAll();}
 
 function smartSearch(){
   const q=$('globalSearch').value.trim(); if(!q) return;
