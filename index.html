@@ -15,7 +15,7 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark"><img src="https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222876/pin-d-pos_nmdij0.png" alt="DynamicDoc" onerror="this.style.display='none';this.parentElement.textContent='D'"></div>
+        <div class="brand-mark"><img src="https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222463/pin-d_negativo_1_1_tezunv.png" alt="DynamicDoc" onerror="this.style.display='none';this.parentElement.textContent='D'"></div>
         <div><h1>DynamicDoc</h1><p>Portal Corporativo</p></div>
       </div>
       <nav class="menu">
@@ -99,7 +99,58 @@
         <div class="article-list" id="processList"></div>
       </section>
 
-      <section id="academy" class="page"><div class="section-heading articles-topline"><div><h3>Academia Dynamic</h3><p>Trilhas de treinamento, aulas e progresso.</p></div><button class="primary-btn admin-only" id="addTrackBtn">+ Nova trilha</button></div><div class="academy-grid" id="academyGrid"></div></section>
+      <section id="academy" class="page">
+        <div class="academy-hero">
+          <div class="academy-hero-content">
+            <span class="pill">Universidade Corporativa</span>
+            <h3>Academia Dynamic</h3>
+            <p>Aprenda sistemas, processos e boas práticas da Dynamic Travel em trilhas visuais, com progresso, aulas, certificados e conteúdos recomendados.</p>
+            <div class="academy-progress-row">
+              <div>
+                <strong id="academyOverallProgress">0%</strong>
+                <span>progresso geral</span>
+              </div>
+              <div class="academy-progress-bar"><div id="academyOverallBar"></div></div>
+            </div>
+          </div>
+          <div class="academy-hero-card">
+            <span>🎓</span>
+            <strong id="academyTrackCount">0</strong>
+            <small>trilhas ativas</small>
+          </div>
+        </div>
+
+        <div class="academy-stats" id="academyStats"></div>
+
+        <div class="academy-section-top">
+          <div>
+            <h3>Continue aprendendo</h3>
+            <p>Trilhas organizadas por sistemas, processos e onboarding.</p>
+          </div>
+          <button class="primary-btn admin-only" id="addTrackBtn">+ Nova trilha</button>
+        </div>
+
+        <div class="academy-layout">
+          <div>
+            <div class="academy-grid" id="academyGrid"></div>
+          </div>
+          <aside class="academy-side-panel">
+            <div class="certificate-card">
+              <span class="certificate-icon">🏆</span>
+              <h3>Certificados</h3>
+              <p id="academyCertificatesText">Nenhum certificado emitido ainda.</p>
+              <div id="academyCertificates"></div>
+            </div>
+            <div class="featured-class">
+              <span class="play-badge">▶</span>
+              <div>
+                <h4>Aula em destaque</h4>
+                <p id="academyFeaturedLesson">Selecione uma trilha para continuar.</p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
 
       <section id="favorites" class="page"><div class="section-heading"><h3>Favoritos e histórico</h3><p>Conteúdos salvos e acessados recentemente.</p></div><div class="split"><div class="panel"><h3>Favoritos</h3><div id="favoritesList"></div></div><div class="panel"><h3>Histórico</h3><div id="historyList"></div></div></div></section>
 
