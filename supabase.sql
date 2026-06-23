@@ -58,4 +58,3 @@ create table if not exists academy_certificates (
   issued_at timestamp default now(),
   unique(user_key, track_id)
 );
-
