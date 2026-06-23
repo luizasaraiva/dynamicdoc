@@ -47,3 +47,21 @@
   margin: 18px 0 10px;
   color: #0f2f80;
 }
+.profile-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.profile-card div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#currentUserName,
+#currentUserRole {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
