@@ -21,9 +21,9 @@ const initialData = {
     {id:'wts-operacao',system:'wts',name:'Operação'}, {id:'reserva-facil-pesquisa',system:'reserva-facil',name:'Pesquisa'}
   ],
   users:[
-    {id:uid(),name:'Luiza Saraiva',email:'luiza.saraiva@dynamictravel.com',role:'admin',department:'suporte'},
-    {id:uid(),name:'Gestor de Conteúdo',email:'conteudo@dynamictravel.com',role:'gestor',department:'suporte'},
-    {id:uid(),name:'Equipe Eventos',email:'eventos@dynamictravel.com',role:'colaborador',department:'eventos'}
+    {id:uid(),name:'Luiza Saraiva',fullName:'Luiza Pereira Saraiva',email:'luiza.saraiva@dynamictravel.com',role:'admin',department:'suporte'},
+    {id:uid(),name:'Gestor de Conteúdo',fullName:'Gestor de Conteúdo Dynamic',email:'conteudo@dynamictravel.com',role:'gestor',department:'suporte'},
+    {id:uid(),name:'Equipe Eventos',fullName:'Equipe Eventos Dynamic',email:'eventos@dynamictravel.com',role:'colaborador',department:'eventos'}
   ],
   articles:[
     {id:uid(),kind:'article',visibility:'publico',title:'Cadastro de usuários no Argo',summary:'Passo a passo para orientar o cadastro e validação de usuários no Argo.',system:'argo',module:'argo-cadastros',department:'suporte',status:'publicado',tags:['cadastro','usuário','argo','login'],content:'1. Acesse o painel administrativo do cliente.\n2. Localize a área de usuários.\n3. Confira nome, e-mail e perfil de acesso.\n4. Valide centro de custo, empresa, comunidade e permissões.\n5. Salve o cadastro e oriente o primeiro acesso.',image:'',video:'',file:'',internalNote:'Conferir sempre o link correto do cliente antes de validar erro de acesso.',version:'1.0',versions:[],comments:[],views:12,likes:0,dislikes:0,createdAt:nowBR(),updatedAt:nowBR()},
@@ -70,6 +70,7 @@ const canManageContent = () => ['gestor','admin'].includes(currentUser?.role);
 const isAdmin = () => currentUser?.role === 'admin';
 const roleLabel = (role) => ({usuario:'Usuário',colaborador:'Colaborador',gestor:'Gestor de Conteúdo',admin:'Administrador'}[role] || 'Visitante');
 const normalize = (v) => (v || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const displayUserName = (user=currentUser) => user?.fullName || user?.nome_completo || user?.name || user?.nome || user?.email?.split('@')[0] || 'Participante Dynamic';
 
 async function fetchTable(table, select='*'){
   if(!supabaseDb) return {data:null,error:null};
@@ -164,7 +165,7 @@ async function upsert(table,payload){ if(!supabaseDb) return; const {error}=awai
 async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
 
 function applyAccess(){
-  $('currentUserName').textContent = currentUser?.name || 'Visitante';
+  $('currentUserName').textContent = currentUser ? displayUserName(currentUser) : 'Visitante';
   $('currentUserRole').textContent = currentUser ? roleLabel(currentUser.role) : 'Portal público';
   $('loginBtn').classList.toggle('hidden', !!currentUser);
   $('logoutBtn').classList.toggle('hidden', !currentUser);
@@ -284,7 +285,7 @@ function openArticle(id){
   $('articleModalBody').innerHTML = `<div class="modal-body"><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h1>${a.title}</h1><p class="muted">${a.summary||''}</p>${a.image?`<img class="content-media" src="${a.image}" alt="Imagem do artigo">`:''}${a.video?`<video class="content-media" src="${a.video}" controls></video>`:''}<div class="content-text">${(a.content||'').split('\n').map(p=>`<p>${p}</p>`).join('')}</div>${a.file?`<p><a class="primary-btn" href="${a.file}" target="_blank">Abrir arquivo</a></p>`:''}${isStaff()&&a.internalNote?`<div class="comment-box"><strong>Observação interna</strong><p>${a.internalNote}</p></div>`:''}<div class="comment-box"><strong>Comentários internos</strong><div>${(a.comments||[]).map(c=>`<p><b>${c.author}</b> • ${c.date}<br>${c.text}</p>`).join('')||'<p class="muted">Nenhum comentário.</p>'}</div>${isStaff()?`<textarea id="newComment" rows="2" placeholder="Adicionar comentário interno"></textarea><button class="primary-btn" onclick="addComment('${a.id}')">Comentar</button>`:''}</div><div class="article-actions"><button class="small-btn" onclick="rateArticle('${a.id}','likes')">👍 ${a.likes||0}</button><button class="small-btn" onclick="rateArticle('${a.id}','dislikes')">👎 ${a.dislikes||0}</button></div></div>`;
   $('articleModal').classList.remove('hidden');
 }
-function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:currentUser?.name||'Colaborador',date:nowBR(),text}); saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
+function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:displayUserName(currentUser)||'Colaborador',date:nowBR(),text}); saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
 function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
 function toggleFavorite(id){db.favorites=db.favorites.includes(id)?db.favorites.filter(x=>x!==id):[id,...db.favorites]; saveDb(); renderAll();}
 
@@ -294,7 +295,7 @@ function editArticle(id){ const a=db.articles.find(x=>x.id===id); if(!a) return;
 function saveArticle(){
   if(!canManageContent()) return alert('Sem permissão.');
   const id=$('articleId').value||uid(); const old=db.articles.find(a=>a.id===id); const base=old||{id,views:0,likes:0,dislikes:0,comments:[],versions:[],createdAt:nowBR()};
-  if(old){ base.versions=base.versions||[]; base.versions.push({version:base.version||'1.0',date:nowBR(),title:base.title,content:base.content,author:currentUser?.name||'Sistema'}); }
+  if(old){ base.versions=base.versions||[]; base.versions.push({version:base.version||'1.0',date:nowBR(),title:base.title,content:base.content,author:displayUserName(currentUser)||'Sistema'}); }
   const nextVersion = old ? (parseFloat(old.version||'1.0')+0.1).toFixed(1) : '1.0';
   const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').innerHTML.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image:$('articleImage').value.trim(), video:$('articleVideo').value.trim(), file:$('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
   if(!article.title) return alert('Informe o título.');
@@ -349,7 +350,7 @@ function ensureCertificate(track){
   track.certificates.push({
     id: uid(),
     user: currentAcademyUserKey(),
-    name: currentUser?.name || 'Visitante',
+    name: displayUserName(currentUser),
     email: currentUser?.email || '',
     issuedAt: nowBR()
   });
@@ -505,7 +506,7 @@ function certificateCode(trackTitle, issuedAt){
   return `CERT-DD-${new Date().getFullYear()}-${base || '000001'}`;
 }
 function downloadCertificate(trackTitle, issuedAt){
-  const name = currentUser?.name || 'Participante Dynamic';
+  const name = displayUserName(currentUser);
   const date = issuedAt || nowBR();
   const moduleName = trackTitle || 'Trilha Dynamic';
   const code = certificateCode(moduleName, date);
@@ -544,8 +545,8 @@ function downloadCertificate(trackTitle, issuedAt){
           padding:28px;
         }
         .certificate{
-          width:1120px;
-          min-height:790px;
+          width:1180px;
+          min-height:835px;
           background:
             radial-gradient(circle at 82% 25%, rgba(11,108,255,.08), transparent 30%),
             radial-gradient(circle at 8% 95%, rgba(5,55,152,.08), transparent 28%),
@@ -555,7 +556,7 @@ function downloadCertificate(trackTitle, issuedAt){
           position:relative;
           overflow:hidden;
           box-shadow:0 30px 90px rgba(8,36,92,.18);
-          padding:46px 58px 34px;
+          padding:38px 64px 78px;
         }
         .certificate:before{
           content:"";
@@ -582,19 +583,19 @@ function downloadCertificate(trackTitle, issuedAt){
         }
         .corner-logo{
           position:absolute;
-          top:40px;
-          left:45px;
-          width:145px;
-          height:145px;
+          top:48px;
+          left:50px;
+          width:118px;
+          height:118px;
           object-fit:contain;
           z-index:2;
           filter:drop-shadow(0 16px 24px rgba(0,0,0,.28));
         }
         .watermark{
           position:absolute;
-          right:80px;
-          top:130px;
-          width:390px;
+          right:72px;
+          top:120px;
+          width:360px;
           opacity:.055;
           z-index:1;
         }
@@ -604,7 +605,7 @@ function downloadCertificate(trackTitle, issuedAt){
           text-align:center;
         }
         .brand-title{
-          font-size:44px;
+          font-size:40px;
           font-weight:900;
           letter-spacing:-.05em;
           color:var(--blue-dark);
@@ -620,8 +621,8 @@ function downloadCertificate(trackTitle, issuedAt){
           text-transform:uppercase;
         }
         .main-title{
-          margin:34px 0 0;
-          font-size:62px;
+          margin:28px 0 0;
+          font-size:56px;
           line-height:1;
           letter-spacing:.10em;
           font-weight:900;
@@ -629,7 +630,7 @@ function downloadCertificate(trackTitle, issuedAt){
           text-transform:uppercase;
         }
         .subtitle{
-          margin:15px auto 32px;
+          margin:13px auto 24px;
           color:var(--blue-bright);
           font-size:22px;
           letter-spacing:.32em;
@@ -644,14 +645,18 @@ function downloadCertificate(trackTitle, issuedAt){
         .intro{font-size:17px;margin:0 0 6px;color:#344161}
         .student-name{
           font-family:'Great Vibes',cursive;
-          font-size:72px;
-          line-height:1.05;
+          font-size:clamp(48px, 5vw, 66px);
+          line-height:1.04;
+          max-width:820px;
+          margin-left:auto;
+          margin-right:auto;
+          overflow-wrap:break-word;
           color:var(--blue-dark);
           margin:8px 0 14px;
         }
         .course-text{font-size:17px;color:#344161;margin:0}
         .course-name{
-          font-size:34px;
+          font-size:32px;
           color:var(--blue-bright);
           font-weight:900;
           letter-spacing:.05em;
@@ -660,17 +665,18 @@ function downloadCertificate(trackTitle, issuedAt){
         }
         .description{
           max-width:690px;
-          margin:0 auto 28px;
+          margin:0 auto 22px;
           font-size:16px;
           line-height:1.55;
           color:#344161;
         }
         .seal{
           position:absolute;
-          left:92px;
-          top:315px;
-          width:140px;
-          height:140px;
+          right:105px;
+          top:98px;
+          left:auto;
+          width:118px;
+          height:118px;
           border-radius:50%;
           background:linear-gradient(145deg,#f8df80,#bd861c);
           display:grid;
@@ -686,11 +692,12 @@ function downloadCertificate(trackTitle, issuedAt){
           background:linear-gradient(135deg,var(--blue-dark),var(--blue-bright));
           border:3px solid rgba(255,255,255,.45);
         }
-        .seal img{position:relative;z-index:2;width:72px;height:72px;object-fit:contain}
+        .seal img{position:relative;z-index:2;width:58px;height:58px;object-fit:contain}
         .seal-ribbons{
           position:absolute;
-          left:118px;
-          top:435px;
+          right:132px;
+          top:200px;
+          left:auto;
           z-index:2;
           display:flex;
           gap:8px;
@@ -698,8 +705,8 @@ function downloadCertificate(trackTitle, issuedAt){
         .seal-ribbons span{display:block;width:35px;height:95px;background:var(--blue-dark);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)}
         .seal-ribbons span:last-child{background:var(--blue-main)}
         .info-row{
-          width:690px;
-          margin:22px auto 46px;
+          width:760px;
+          margin:18px auto 30px;
           background:#fff;
           border:1px solid rgba(8,36,92,.10);
           border-radius:14px;
@@ -714,13 +721,14 @@ function downloadCertificate(trackTitle, issuedAt){
         .info-item span{font-size:16px;color:var(--blue-dark)}
         .bottom{
           display:grid;
-          grid-template-columns:1fr 1fr 1fr;
-          gap:24px;
+          grid-template-columns:1.15fr .85fr 1.15fr;
+          gap:22px;
           align-items:end;
-          margin-top:6px;
+          margin-top:10px;
+          margin-bottom:26px;
           text-align:left;
         }
-        .signature{text-align:left;padding-left:115px}
+        .signature{text-align:left;padding-left:42px}
         .signature .sign{
           font-family:'Great Vibes',cursive;
           font-size:38px;
@@ -753,7 +761,7 @@ function downloadCertificate(trackTitle, issuedAt){
           background:var(--blue-dark);
           color:#fff;
           border-radius:18px 18px 0 0;
-          padding:14px 56px 13px;
+          padding:10px 54px 11px;
           text-align:center;
           z-index:4;
           border:2px solid var(--gold);
@@ -822,7 +830,7 @@ function downloadCertificate(trackTitle, issuedAt){
 function renderAdmin(){
   const top=db.articles.slice().sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,5);
   $('adminStats').innerHTML=[{n:db.articles.length,t:'Conteúdos'},{n:db.users.length,t:'Usuários'},{n:db.searchLogs.length,t:'Buscas'},{n:db.modules.length,t:'Módulos'}].map(c=>`<div class="stat-card"><strong>${c.n}</strong><span>${c.t}</span></div>`).join('');
-  $('usersList').innerHTML=db.users.map(u=>`<div class="user-row"><span><b>${u.name}</b><br><small>${u.email} • ${roleLabel(u.role)}</small></span><button class="small-btn small-danger" onclick="removeUser('${u.id}')">Remover</button></div>`).join('');
+  $('usersList').innerHTML=db.users.map(u=>`<div class="user-row"><span><b>${escapeHtml(u.fullName || u.name)}</b><br><small>${escapeHtml(u.email)} • ${roleLabel(u.role)}</small></span><button class="small-btn small-danger" onclick="removeUser('${u.id}')">Remover</button></div>`).join('');
   $('searchMetrics').innerHTML=(db.searchLogs.slice(0,10).map(s=>`<div class="metric-row"><span>${s.query}</span><small>${s.date}</small></div>`).join('')||'<p class="muted">Nenhuma busca registrada.</p>') + `<h4>Mais acessados</h4>${top.map(a=>`<div class="metric-row"><span>${a.title}</span><b>${a.views||0}</b></div>`).join('')}`;
   const versionQuery = normalize($('versionSearch')?.value || '');
   const versionResults = db.articles.filter(a => {
@@ -835,7 +843,7 @@ function renderAdmin(){
   });
   $('versionsList').innerHTML = versionResults.map(a=>`<div class="version-item"><span><b>${a.title}</b><br><small>Versão atual: ${a.version||'1.0'} • anteriores: ${(a.versions||[]).length}</small></span><button class="small-btn" onclick="editArticle('${a.id}')">Editar</button></div>`).join('') || '<p class="muted">Nenhuma versão encontrada.</p>';
 }
-function addUser(){const u={id:uid(),name:$('userName').value.trim(),email:$('userEmail').value.trim(),role:$('userRole').value,department:$('userDepartment').value}; if(!u.name||!u.email) return alert('Preencha nome e e-mail.'); db.users.unshift(u); saveDb(); upsert(PROFILE_TABLE, u); ['userName','userEmail'].forEach(id=>$(id).value=''); renderAdmin();}
+function addUser(){const fullName=$('userFullName')?.value.trim()||''; const u={id:uid(),name:$('userName').value.trim(),fullName,email:$('userEmail').value.trim(),role:$('userRole').value,department:$('userDepartment').value}; if(!u.name||!u.fullName||!u.email) return alert('Preencha nome, nome completo e e-mail.'); db.users.unshift(u); saveDb(); upsert(PROFILE_TABLE, u); ['userName','userFullName','userEmail'].forEach(id=>{if($(id)) $(id).value=''}); renderAdmin();}
 function removeUser(id){db.users=db.users.filter(u=>u.id!==id); saveDb(); removeRemote(PROFILE_TABLE, id); renderAdmin();}
 function addSystem(){const name=$('newSystemName').value.trim(); if(!name) return; const s={id:normalize(name).replaceAll(' ','-'),name,description:'Sistema cadastrado pela administração.'}; db.systems.push(s); saveDb(); upsert(SYSTEM_TABLE, s); $('newSystemName').value=''; renderAll();}
 function addModule(){const name=$('newModuleName').value.trim(); if(!name) return; const m={id:normalize($('moduleSystem').value+'-'+name).replaceAll(' ','-'),system:$('moduleSystem').value,name}; db.modules.push(m); saveDb(); upsert(MODULE_TABLE, m); $('newModuleName').value=''; renderAll();}
@@ -849,11 +857,11 @@ function smartSearch(){
 }
 async function login(){
   const email=$('loginEmail').value.trim(), pass=$('loginPassword').value;
-  if(supabaseDb && email && pass){ const {error}=await supabaseDb.auth.signInWithPassword({email,password:pass}); if(error) return alert('Erro no login: '+error.message); currentUser={name:email,email,role:'admin',department:'suporte'}; }
-  else currentUser={id:uid(),name:email?.split('@')[0]||'Colaborador Dynamic',email:email||'demo@dynamictravel.com',role:'colaborador',department:'suporte'};
+  if(supabaseDb && email && pass){ const {error}=await supabaseDb.auth.signInWithPassword({email,password:pass}); if(error) return alert('Erro no login: '+error.message); const profile=db.users.find(u=>normalize(u.email)===normalize(email)); currentUser=profile ? {...profile} : {name:email,fullName:email,email,role:'admin',department:'suporte'}; }
+  else { const profile=db.users.find(u=>normalize(u.email)===normalize(email)); currentUser=profile ? {...profile} : {id:uid(),name:email?.split('@')[0]||'Colaborador Dynamic',fullName:email?.split('@')[0]||'Colaborador Dynamic',email:email||'demo@dynamictravel.com',role:'colaborador',department:'suporte'}; }
   saveUser(); $('loginPanel').classList.add('hidden'); renderAll();
 }
-function testLogin(role){currentUser={id:uid(),name:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo':'Colaborador Dynamic',email:`${role}@dynamictravel.com`,role,department:'suporte'}; saveUser(); $('loginPanel').classList.add('hidden'); renderAll();}
+function testLogin(role){currentUser={id:uid(),name:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo':'Colaborador Dynamic',fullName:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo Dynamic':'Colaborador Dynamic',email:`${role}@dynamictravel.com`,role,department:'suporte'}; saveUser(); $('loginPanel').classList.add('hidden'); renderAll();}
 function logout(){currentUser=null; saveUser(); renderAll(); navigate('home');}
 
 function bindEvents(){
