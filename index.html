@@ -3,472 +3,98 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DynamicDoc | Portal de Conhecimento</title>
+  <title>DynamicDoc | Portal Corporativo</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark"><img src="logo-dynamicdoc.png" alt="DynamicDoc" onerror="this.style.display='none'; this.parentElement.textContent='D';"></div>
-        <div>
-          <h1>DynamicDoc</h1>
-          <p>Portal de Conhecimento</p>
-        </div>
+        <div class="brand-mark"><img src="logo-dynamicdoc.png" alt="DynamicDoc" onerror="this.style.display='none';this.parentElement.textContent='D'"></div>
+        <div><h1>DynamicDoc</h1><p>Portal Corporativo</p></div>
       </div>
-
       <nav class="menu">
         <button class="nav-link active" data-page="home">Início</button>
         <button class="nav-link" data-page="articles">Artigos</button>
-        <button class="nav-link" data-page="favorites">Favoritos</button>
         <button class="nav-link" data-page="systems">Sistemas</button>
-        <button class="nav-link dept-menu" data-page="departments">Departamentos</button>
         <button class="nav-link staff-only" data-page="processes">Processos internos</button>
+        <button class="nav-link" data-page="academy">Academia Dynamic</button>
+        <button class="nav-link" data-page="favorites">Favoritos</button>
         <button class="nav-link admin-only" data-page="admin">Administração</button>
       </nav>
-
-      <div class="profile-card">
-        <span class="status-dot"></span>
-        <div>
-          <strong id="currentUserName">Visitante</strong>
-          <p id="currentUserRole">Faça login</p>
-        </div>
-      </div>
+      <div class="profile-card"><span class="status-dot"></span><div><strong id="currentUserName">Visitante</strong><p id="currentUserRole">Portal público</p></div></div>
     </aside>
 
     <main class="main-content">
       <header class="topbar">
-        <div>
-          <span class="eyebrow">Dynamic Travel</span>
-          <h2 id="pageTitle">Base de conhecimento</h2>
-        </div>
-        <div class="top-actions">
-          <button class="ghost-btn" id="loginBtn">Entrar</button>
-        </div>
+        <div><span class="eyebrow">Dynamic Travel</span><h2 id="pageTitle">Base de conhecimento</h2></div>
+        <div class="top-actions"><button class="ghost-btn" id="loginBtn">Entrar</button><button class="danger-btn hidden" id="logoutBtn">Sair</button></div>
       </header>
 
       <section id="loginPanel" class="login-panel hidden">
         <div class="login-card">
           <button class="close-btn" id="closeLogin">×</button>
-          <h2>Acessar DynamicDoc</h2>
-          <p>Acesso restrito para usuários corporativos e administradores.</p>
-
-          <label>E-mail</label>
-          <input id="loginEmail" type="email" placeholder="nome@dynamictravel.com.br" />
-
-          <label>Senha</label>
-          <input id="loginPassword" type="password" placeholder="Digite sua senha" />
-
-          <button class="primary-btn full" id="confirmLogin">Entrar no portal</button>
-          <button class="ghost-btn full" id="forgotPasswordBtn" style="margin-top:10px;">Esqueci minha senha</button>
-        </div>
-      </section>
-
-
-      <section id="access" class="page">
-        <div class="access-page">
-          <div class="access-hero">
-            <span class="pill">Acesso seguro</span>
-            <h1>Acesse o DynamicDoc</h1>
-            <p>Centralizando conhecimento, simplificando processos e conectando clientes, colaboradores e administradores em um único portal.</p>
-            <div class="access-highlights">
-              <span>Base de conhecimento</span>
-              <span>Procedimentos internos</span>
-              <span>Gestão de usuários</span>
-              <span>Documentação centralizada</span>
-            </div>
-          </div>
-
-          <div class="access-card">
-            <div class="access-tabs">
-              <button class="access-tab active" data-access-tab="loginBox">Login</button>
-              <button class="access-tab" data-access-tab="recoverBox">Recuperar senha</button>
-              <button class="access-tab" data-access-tab="requestBox">Solicitar acesso</button>
-            </div>
-
-            <div id="loginBox" class="access-box active-access-box">
-              <h3>Entrar no portal</h3>
-              <p class="muted">Acesso restrito para usuários corporativos e administradores.</p>
-              <label>E-mail</label>
-              <input id="accessEmail" type="email" placeholder="nome@empresa.com.br" />
-              <label>Senha</label>
-              <input id="accessPassword" type="password" placeholder="Digite sua senha" />
-              <label>Perfil de teste</label>
-              <select id="accessRole">
-                <option value="colaborador">Usuário corporativo</option>
-                <option value="admin">Administrador</option>
-              </select>
-              <label>Departamento</label>
-              <select id="accessDepartment">
-                <option>Suporte</option>
-                <option>Financeiro</option>
-                <option>Eventos</option>
-                <option>Operação</option>
-              </select>
-              <label class="check-line"><input id="rememberAccess" type="checkbox" /> Lembrar acesso</label>
-              <button class="primary-btn full" id="accessLoginBtn">Entrar</button>
-            </div>
-
-            <div id="recoverBox" class="access-box">
-              <h3>Recuperar acesso</h3>
-              <p class="muted">Informe o e-mail cadastrado para simular o envio do link de redefinição.</p>
-              <label>E-mail</label>
-              <input id="recoverEmail" type="email" placeholder="nome@empresa.com.br" />
-              <button class="primary-btn full" id="recoverBtn">Enviar link de redefinição</button>
-              <div id="recoverMessage" class="success-message hidden">Se o e-mail estiver cadastrado, enviaremos um link para redefinição da senha.</div>
-            </div>
-
-            <div id="requestBox" class="access-box">
-              <h3>Solicitação de acesso</h3>
-              <p class="muted">A solicitação será analisada pela administração do DynamicDoc.</p>
-              <label>Nome completo</label>
-              <input id="requestName" type="text" placeholder="Nome completo" />
-              <label>E-mail corporativo</label>
-              <input id="requestEmail" type="email" placeholder="nome@empresa.com.br" />
-              <label>Empresa</label>
-              <input id="requestCompany" type="text" placeholder="Empresa" />
-              <label>Departamento</label>
-              <select id="requestDepartment">
-                <option>Suporte</option>
-                <option>Financeiro</option>
-                <option>Eventos</option>
-                <option>Operação</option>
-              </select>
-              <label>Justificativa de acesso</label>
-              <textarea id="requestReason" rows="4" placeholder="Descreva por que precisa acessar o portal"></textarea>
-              <button class="primary-btn full" id="requestAccessBtn">Solicitar acesso</button>
-              <div id="requestMessage" class="success-message hidden">Solicitação registrada para análise administrativa.</div>
-            </div>
-          </div>
+          <h2>Acessar DynamicDoc</h2><p>Acesso corporativo para colaboradores, gestores de conteúdo e administradores.</p>
+          <label>E-mail</label><input id="loginEmail" type="email" placeholder="nome@dynamictravel.com.br">
+          <label>Senha</label><input id="loginPassword" type="password" placeholder="Digite sua senha">
+          <button class="primary-btn full" id="confirmLogin">Entrar</button>
+          <div class="test-login"><span>Protótipo:</span><button data-test-role="colaborador">Colaborador</button><button data-test-role="gestor">Gestor</button><button data-test-role="admin">Admin</button></div>
         </div>
       </section>
 
       <section id="home" class="page active-page">
-        <div class="hero">
-          <div>
-            <span class="pill">Conhecimento centralizado</span>
-            <h1>Encontre processos, manuais e orientações em poucos cliques.</h1>
-            <p>Conteúdos separados por sistemas, departamentos e artigos editáveis para manter a operação sempre alinhada.</p>
-          </div>
-          <div class="hero-card">
-            <strong>DynamicDoc</strong>
-            <span>Clean • Simples • Externo</span>
-          </div>
-        </div>
-
-        <div id="portalBanner" class="portal-banner hidden"></div>
-
-        <div class="search-box">
-          <input id="globalSearch" type="search" placeholder="Buscar por artigo, sistema, tag ou erro comum..." />
-          <button class="primary-btn" id="searchBtn">Buscar</button>
-        </div>
-
+        <div class="hero"><div><span class="pill">Produto interno</span><h1>Conhecimento, processos, treinamento e gestão em um único portal.</h1><p>O DynamicDoc agora está estruturado como produto interno: artigos, módulos, permissões, métricas, comentários internos, versões, favoritos, histórico e Academia Dynamic.</p></div><div class="hero-card"><strong>DynamicDoc</strong><span>Conteúdo • Dados • Treinamento</span></div></div>
+        <div class="search-box"><input id="globalSearch" type="search" placeholder="Buscar por artigo, processo, sistema, módulo, tag ou dúvida..."><button class="primary-btn" id="searchBtn">Buscar</button></div>
         <div class="dashboard-grid" id="dashboardStats"></div>
-
-        <div class="section-heading">
-          <h3>Sistemas</h3>
-          <p>Escolha uma categoria para visualizar os artigos.</p>
-        </div>
-        <div class="grid cards-grid" id="systemCards"></div>
-
-        <div class="section-heading">
-          <h3>Artigos recomendados</h3>
-          <p>Orientações sugeridas para consulta rápida na base.</p>
-        </div>
-        <div class="article-list" id="recentArticles"></div>
+        <div class="section-heading"><h3>Sistemas</h3><p>Categorias principais com módulos vinculados.</p></div><div class="grid cards-grid" id="systemCards"></div>
+        <div class="section-heading"><h3>Últimos conteúdos</h3><p>Artigos e processos publicados recentemente.</p></div><div class="article-list" id="recentArticles"></div>
       </section>
 
       <section id="articles" class="page">
-        <div class="section-heading articles-topline">
-          <div>
-            <h3>Artigos</h3>
-            <p>Consulte, filtre e mantenha a base de conhecimento atualizada.</p>
-          </div>
-          <button class="primary-btn staff-only" id="newArticleBtn">+ Criar artigo</button>
-        </div>
-        <div class="filters">
-          <input id="articleSearch" type="search" placeholder="Pesquisar artigos..." />
-          <select id="filterSystem"><option value="">Todos os sistemas</option></select>
-          <select id="filterDepartment"><option value="">Todos os departamentos</option></select>
-          <select id="filterStatus" class="admin-only">
-            <option value="publicado">Publicados</option>
-            <option value="rascunho">Rascunhos</option>
-            <option value="revisao">Em revisão</option>
-            <option value="arquivado">Arquivados</option>
-            <option value="">Todos</option>
-          </select>
-        </div>
+        <div class="section-heading articles-topline"><div><h3>Artigos</h3><p>Base pública e corporativa, com status, versões e busca completa.</p></div><button class="primary-btn content-manager-only" id="newArticleBtn">+ Criar artigo</button></div>
+        <div class="filters"><input id="articleSearch" type="search" placeholder="Pesquisar artigos..."><select id="filterSystem"><option value="">Todos os sistemas</option></select><select id="filterModule"><option value="">Todos os módulos</option></select><select id="filterStatus" class="staff-only"><option value="publicado">Publicados</option><option value="rascunho">Rascunhos</option><option value="revisao">Em revisão</option><option value="arquivado">Arquivados</option><option value="">Todos</option></select></div>
         <div class="article-list" id="articlesList"></div>
       </section>
 
       <section id="articleEditor" class="page">
-        <div class="section-heading articles-topline">
-          <div>
-            <h3 id="articleEditorTitle">Novo artigo</h3>
-            <p id="articleEditorDescription">Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.</p>
-          </div>
-          <button class="ghost-btn" id="backToArticlesBtn">Voltar para artigos</button>
-        </div>
-
+        <div class="section-heading articles-topline"><div><h3 id="articleEditorTitle">Novo conteúdo</h3><p>Use links externos para imagens/vídeos ou Supabase Storage/Cloudinary.</p></div><button class="ghost-btn" id="backToArticlesBtn">Voltar</button></div>
         <div class="panel article-form-panel">
-          <input type="hidden" id="articleId" />
-          <input type="hidden" id="formKind" value="article" />
+          <input type="hidden" id="articleId"><input type="hidden" id="formKind" value="article">
           <div class="form-grid">
-            <div>
-              <label>Título</label>
-              <input id="formTitle" type="text" placeholder="Ex: Cadastro de usuários no Argo" />
-            </div>
-            <div>
-              <label>Status</label>
-              <select id="formStatus">
-                <option value="publicado">Publicado</option>
-                <option value="rascunho">Rascunho</option>
-                <option value="revisao">Em revisão</option>
-                <option value="arquivado">Arquivado</option>
-              </select>
-            </div>
-            <div>
-              <label>Sistema</label>
-              <select id="formSystem"></select>
-            </div>
-            <div>
-              <label>Módulo</label>
-              <select id="formModule">
-                <option value="">Selecione um sistema primeiro</option>
-              </select>
-            </div>
-            <div>
-              <label>Departamento</label>
-              <select id="formDepartment"></select>
-            </div>
+            <div><label>Título</label><input id="articleTitle" type="text" placeholder="Título do conteúdo"></div>
+            <div><label>Status</label><select id="articleStatus"><option value="rascunho">Rascunho</option><option value="revisao">Em revisão</option><option value="publicado">Publicado</option><option value="arquivado">Arquivado</option></select></div>
+            <div><label>Sistema</label><select id="articleSystem"></select></div>
+            <div><label>Módulo</label><select id="articleModule"></select></div>
+            <div><label>Departamento</label><select id="articleDepartment"></select></div>
+            <div><label>Tipo</label><select id="articleVisibility"><option value="publico">Público/Cliente</option><option value="interno">Interno/Colaborador</option></select></div>
           </div>
-
-          <label>Resumo</label>
-          <input id="formSummary" type="text" placeholder="Resumo curto do artigo" />
-
-          <label>Tags</label>
-          <input id="formTags" type="text" placeholder="cadastro, acesso, argo" />
-
-          <div class="form-grid">
-            <div>
-              <label>Imagem</label>
-              <input id="formImage" type="url" placeholder="URL da imagem" />
-            </div>
-            <div>
-              <label>Vídeo</label>
-              <input id="formVideo" type="url" placeholder="URL do vídeo" />
-            </div>
-          </div>
-
-          <label>Conteúdo do artigo</label>
-          <div class="doc-editor-shell">
-            <div class="doc-toolbar" aria-label="Ferramentas de edição do documento">
-              <button type="button" data-command="formatBlock" data-value="h2">Título</button>
-              <button type="button" data-command="formatBlock" data-value="h3">Subtítulo</button>
-              <button type="button" data-command="bold"><strong>B</strong></button>
-              <button type="button" data-command="italic"><em>I</em></button>
-              <button type="button" data-command="underline"><u>U</u></button>
-              <button type="button" data-command="insertUnorderedList">Lista</button>
-              <button type="button" data-command="insertOrderedList">1. Lista</button>
-              <button type="button" data-action="link">Link</button>
-              <button type="button" data-action="image">Imagem</button>
-              <button type="button" data-action="video">Vídeo</button>
-              <button type="button" data-command="removeFormat">Limpar formato</button>
-            </div>
-            <div id="formContent" class="doc-editor" contenteditable="true" data-placeholder="Digite aqui como se estivesse editando um documento: títulos, passos, observações, links e imagens."></div>
-          </div>
-
-          <div class="form-actions">
-            <button class="ghost-btn" id="clearArticleForm">Limpar</button>
-            <button class="primary-btn" id="saveArticle">Salvar artigo</button>
-          </div>
+          <label>Resumo</label><textarea id="articleSummary" rows="2" placeholder="Resumo do conteúdo"></textarea>
+          <label>Conteúdo</label><textarea id="articleContent" rows="10" placeholder="Passo a passo, orientações, regras, links..."></textarea>
+          <div class="form-grid"><div><label>Tags separadas por vírgula</label><input id="articleTags" type="text" placeholder="argo, cadastro, aprovação"></div><div><label>Imagem (URL)</label><input id="articleImage" type="url" placeholder="https://..."></div><div><label>Vídeo (URL)</label><input id="articleVideo" type="url" placeholder="https://..."></div><div><label>Arquivo/PDF (URL)</label><input id="articleFile" type="url" placeholder="https://..."></div></div>
+          <label>Observação interna</label><textarea id="articleInternalNote" rows="3" placeholder="Visível apenas para colaboradores"></textarea>
+          <div class="editor-actions"><button class="primary-btn" id="saveArticleBtn">Salvar conteúdo</button><button class="ghost-btn" id="duplicateArticleBtn">Duplicar como nova versão</button></div>
         </div>
       </section>
 
-      <section id="favorites" class="page">
-        <div class="section-heading">
-          <h3>Meus favoritos</h3>
-          <p>Artigos marcados para acesso rápido.</p>
-        </div>
-        <div class="article-list" id="favoritesList"></div>
-      </section>
+      <section id="systems" class="page"><div class="section-heading articles-topline"><div><h3>Sistemas e módulos</h3><p>Cadastre categorias e organize módulos.</p></div></div><div class="grid cards-grid" id="systemsPageCards"></div><div class="panel admin-only"><h3>Novo sistema/módulo</h3><div class="form-grid"><input id="newSystemName" placeholder="Novo sistema"><button class="primary-btn" id="addSystemBtn">Adicionar sistema</button><select id="moduleSystem"></select><input id="newModuleName" placeholder="Novo módulo"><button class="primary-btn" id="addModuleBtn">Adicionar módulo</button></div></div></section>
 
-      <section id="systems" class="page">
-        <div class="section-heading">
-          <h3>Categorias por sistema</h3>
-          <p>Estrutura inicial do portal. O administrador pode criar novas categorias.</p>
-        </div>
-        <div class="grid cards-grid" id="systemsPageGrid"></div>
-      </section>
+      <section id="processes" class="page"><div class="section-heading articles-topline"><div><h3>Processos internos</h3><p>Conteúdo exclusivo para colaboradores.</p></div><button class="primary-btn content-manager-only" id="newProcessBtn">+ Criar processo</button></div><div class="article-list" id="processList"></div></section>
 
-      <section id="departments" class="page">
-        <div class="section-heading">
-          <h3>Departamentos</h3>
-          <p>Conteúdos organizados por área de atuação.</p>
-        </div>
-        <div class="grid cards-grid" id="departmentsGrid"></div>
-      </section>
+      <section id="academy" class="page"><div class="section-heading articles-topline"><div><h3>Academia Dynamic</h3><p>Trilhas de treinamento, aulas e progresso.</p></div><button class="primary-btn admin-only" id="addTrackBtn">+ Nova trilha</button></div><div class="academy-grid" id="academyGrid"></div></section>
 
+      <section id="favorites" class="page"><div class="section-heading"><h3>Favoritos e histórico</h3><p>Conteúdos salvos e acessados recentemente.</p></div><div class="split"><div class="panel"><h3>Favoritos</h3><div id="favoritesList"></div></div><div class="panel"><h3>Histórico</h3><div id="historyList"></div></div></div></section>
 
-      <section id="processes" class="page">
-        <div class="section-heading articles-topline">
-          <div>
-            <h3>Processos internos</h3>
-            <p>Processos internos ficam separados dos artigos da base e aparecem somente nesta tela.</p>
-          </div>
-          <button class="primary-btn staff-only" id="newProcessBtn">+ Criar processo interno</button>
-        </div>
-
-        <div class="panel module-admin-panel admin-only">
-          <div class="panel-header">
-            <div>
-              <h3>Cadastrar módulo</h3>
-              <p class="muted">Crie módulos previamente e vincule os artigos a eles no cadastro/edição.</p>
-            </div>
-          </div>
-          <div class="mini-form module-form">
-            <select id="newModuleSystem"></select>
-            <input id="newModuleName" type="text" placeholder="Nome do módulo. Ex: Cadastros" />
-            <button class="primary-btn" id="addModuleBtn">+ Criar módulo</button>
-          </div>
-        </div>
-
-        <div class="process-search-box">
-          <input id="processSearch" type="search" placeholder="Pesquisar processo, módulo ou artigo..." />
-        </div>
-
-        <div class="process-flow-actions" id="processFlowActions"></div>
-        <div class="process-board process-hierarchy" id="processBoard"></div>
-        <div class="article-list simple-process-list" id="processList"></div>
-      </section>
-
-      <section id="admin" class="page">
-        <div class="section-heading">
-          <h3>Administração DynamicDoc</h3>
-          <p>Gerencie clientes corporativos, usuários da agência e comentários administrativos.</p>
-        </div>
-
-        <div class="admin-stack">
-          <div class="panel admin-only">
-            <div class="panel-header">
-              <div>
-                <h3>Aviso do portal</h3>
-                <p class="muted">Mensagem exibida no início para comunicar mudanças importantes.</p>
-              </div>
-            </div>
-            <div class="mini-form banner-form">
-              <input id="portalBannerInput" type="text" placeholder="Ex: Novo fluxo de aprovação disponível no Argo" />
-              <button class="primary-btn" id="saveBannerBtn">Salvar aviso</button>
-              <button class="ghost-btn" id="clearBannerBtn">Remover aviso</button>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-header">
-              <div>
-                <h3>Artigos por sistema</h3>
-                <p class="muted">Visão administrativa da distribuição de conteúdos por OBT.</p>
-              </div>
-            </div>
-            <div id="articlesChart" class="chart-box"></div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div>
-                <h3>Gerenciamento de clientes</h3>
-                <p class="muted">Usuários clientes são cadastrados como usuários comuns por padrão.</p>
-              </div>
-            </div>
-            <div class="mini-form three-cols">
-              <input id="clientName" type="text" placeholder="Nome do cliente" />
-              <input id="clientEmail" type="email" placeholder="E-mail" />
-              <input id="clientCompany" type="text" placeholder="Empresa" />
-              <button class="primary-btn" id="addClient">+ Cadastrar cliente</button>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>E-mail</th>
-                    <th>Empresa</th>
-                    <th>Perfil</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody id="clientsTable"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div>
-                <h3>Usuários agência</h3>
-                <p class="muted">Cadastre usuários internos como administrador, colaborador ou usuário corporativo.</p>
-              </div>
-            </div>
-            <div class="mini-form agency-form">
-              <input id="agencyName" type="text" placeholder="Nome" />
-              <input id="agencyEmail" type="email" placeholder="E-mail" />
-              <select id="agencyDepartment">
-                <option>Suporte</option>
-                <option>Financeiro</option>
-                <option>Eventos</option>
-                <option>Operação</option>
-              </select>
-              <select id="agencyAccess">
-                <option value="usuario corporativo">Usuário corporativo</option>
-                <option value="colaborador">Colaborador</option>
-                <option value="administrador">Administrador</option>
-              </select>
-              <button class="primary-btn" id="addAgencyUser">+ Cadastrar usuário</button>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>E-mail</th>
-                    <th>Departamento</th>
-                    <th>Nível de acesso</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody id="agencyTable"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="admin-grid single-admin-grid">
-            <div class="panel">
-              <h3>Comentários administrativos dos artigos</h3>
-              <p class="muted">Selecione um artigo publicado na lista para registrar comentários internos. A criação de artigos foi removida desta tela.</p>
-              <div id="adminArticles"></div>
-              <hr />
-              <label>Comentário administrativo</label>
-              <textarea id="adminComment" rows="4" placeholder="Comentário visível apenas para administradores"></textarea>
-              <button class="primary-btn full" id="addComment">Adicionar comentário</button>
-              <div id="commentsBox" class="comments-box"></div>
-            </div>
-          </div>          </div>
-        </div>
-      </section>
-
-      <section id="articleModal" class="modal hidden">
-        <div class="modal-content">
-          <button class="close-btn" id="closeArticle">×</button>
-          <div id="articleDetails"></div>
-        </div>
-      </section>
+      <section id="admin" class="page"><div class="section-heading"><h3>Administração</h3><p>Governança, métricas, usuários, solicitações e auditoria.</p></div><div class="dashboard-grid" id="adminStats"></div><div class="admin-stack"><div class="panel"><h3>Usuários</h3><div class="form-grid"><input id="userName" placeholder="Nome"><input id="userEmail" placeholder="E-mail"><select id="userRole"><option value="usuario">Usuário</option><option value="colaborador">Colaborador</option><option value="gestor">Gestor de Conteúdo</option><option value="admin">Administrador</option></select><select id="userDepartment"></select><button class="primary-btn" id="addUserBtn">Adicionar</button></div><div id="usersList"></div></div><div class="panel"><h3>Métricas de busca</h3><div id="searchMetrics"></div></div><div class="panel"><h3>Controle de versões</h3><div id="versionsList"></div></div></div></section>
     </main>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js"></script>
+  <section id="articleModal" class="modal hidden"><div class="modal-content"><button class="close-btn" id="closeArticleModal">×</button><div id="articleModalBody"></div></div></section>
   <script src="app.js"></script>
 </body>
 </html>
+
