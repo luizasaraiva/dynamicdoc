@@ -83,7 +83,21 @@
 
       <section id="systems" class="page"><div class="section-heading articles-topline"><div><h3>Sistemas e módulos</h3><p>Cadastre categorias e organize módulos.</p></div></div><div class="grid cards-grid" id="systemsPageCards"></div><div class="panel admin-only"><h3>Novo sistema/módulo</h3><div class="form-grid"><input id="newSystemName" placeholder="Novo sistema"><button class="primary-btn" id="addSystemBtn">Adicionar sistema</button><select id="moduleSystem"></select><input id="newModuleName" placeholder="Novo módulo"><button class="primary-btn" id="addModuleBtn">Adicionar módulo</button></div></div></section>
 
-      <section id="processes" class="page"><div class="section-heading articles-topline"><div><h3>Processos internos</h3><p>Conteúdo exclusivo para colaboradores.</p></div><button class="primary-btn content-manager-only" id="newProcessBtn">+ Criar processo</button></div><div class="article-list" id="processList"></div></section>
+      <section id="processes" class="page">
+        <div class="section-heading articles-topline">
+          <div><h3>Processos internos</h3><p>Conteúdo exclusivo para colaboradores.</p></div>
+          <button class="primary-btn content-manager-only" id="newProcessBtn">+ Criar processo</button>
+        </div>
+
+        <div class="filters process-filters">
+          <input id="processSearch" type="search" placeholder="Pesquisar processos internos por título, conteúdo, sistema, módulo ou tag...">
+          <select id="processSystem"><option value="">Todos os sistemas</option></select>
+          <select id="processModule"><option value="">Todos os módulos</option></select>
+          <select id="processStatus"><option value="publicado">Publicados</option><option value="rascunho">Rascunhos</option><option value="revisao">Em revisão</option><option value="arquivado">Arquivados</option><option value="">Todos</option></select>
+        </div>
+
+        <div class="article-list" id="processList"></div>
+      </section>
 
       <section id="academy" class="page"><div class="section-heading articles-topline"><div><h3>Academia Dynamic</h3><p>Trilhas de treinamento, aulas e progresso.</p></div><button class="primary-btn admin-only" id="addTrackBtn">+ Nova trilha</button></div><div class="academy-grid" id="academyGrid"></div></section>
 
