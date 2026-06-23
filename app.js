@@ -370,11 +370,11 @@ function renderAcademy(){
   if($('academyTrackCount')) $('academyTrackCount').textContent = totalTracks;
   if($('academyStats')){
     $('academyStats').innerHTML = [
-      {icon:'📚', n: totalTracks, t:'Trilhas'},
-      {icon:'🎥', n: totalLessons, t:'Aulas'},
-      {icon:'✅', n: totalCompletedLessons, t:'Aulas concluídas'},
-      {icon:'🏆', n: certificates.length, t:'Certificados'}
-    ].map(s=>`<div class="academy-stat-card"><span>${s.icon}</span><strong>${s.n}</strong><small>${s.t}</small></div>`).join('');
+      {icon:'', n: totalTracks, t:'Trilhas'},
+      {icon:'', n: totalLessons, t:'Aulas'},
+      {icon:'', n: totalCompletedLessons, t:'Aulas concluídas'},
+      {icon:'', n: certificates.length, t:'Certificados'}
+    ].map(s=>`<div class="academy-stat-card"><strong>${s.n}</strong><small>${s.t}</small></div>`).join('');
   }
 
   if($('academyCertificatesText')){
@@ -404,7 +404,6 @@ function renderAcademy(){
     return `
       <article class="academy-track-card ${certificateAvailable ? 'track-completed' : ''}">
         <div class="track-cover">
-          <span class="track-icon">${trackIcon(t.title)}</span>
           <span class="track-status">${status}</span>
         </div>
         <div class="track-body">
@@ -414,7 +413,7 @@ function renderAcademy(){
           </div>
           <p>${escapeHtml(t.description || 'Trilha de aprendizagem Dynamic.')}</p>
           <div class="track-meta">
-            <span>🎥 ${lessons.length} aulas</span>
+            <span>${lessons.length} aulas</span>
             <span>${completed.length}/${lessons.length} concluídas</span>
           </div>
           <div class="progress academy-track-progress"><div style="width:${progress}%"></div></div>
@@ -438,7 +437,7 @@ function renderAcademy(){
             <button class="primary-btn full track-action" onclick="openTrack('${t.id}')">${buttonText}</button>
             <button class="ghost-btn admin-only" onclick="addLesson('${t.id}')">+ Aula</button>
           </div>
-          ${certificateAvailable ? `<button class="certificate-download-btn" onclick="downloadCertificate('${escapeAttr(t.title)}','${escapeAttr((t.certificates||[]).find(c=>c.user===currentAcademyUserKey())?.issuedAt || nowBR())}')">🏆 Baixar certificado</button>` : ''}
+          ${certificateAvailable ? `<button class="certificate-download-btn" onclick="downloadCertificate('${escapeAttr(t.title)}','${escapeAttr((t.certificates||[]).find(c=>c.user===currentAcademyUserKey())?.issuedAt || nowBR())}')">Baixar certificado</button>` : ''}
         </div>
       </article>
     `;
