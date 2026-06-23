@@ -500,27 +500,322 @@ function addTrack(){
   saveDb();
   renderAcademy();
 }
+function certificateCode(trackTitle, issuedAt){
+  const base = normalize(`${trackTitle}-${issuedAt}-${currentAcademyUserKey()}`).replace(/[^a-z0-9]/g,'').slice(0,10).toUpperCase();
+  return `CERT-DD-${new Date().getFullYear()}-${base || '000001'}`;
+}
 function downloadCertificate(trackTitle, issuedAt){
   const name = currentUser?.name || 'Participante Dynamic';
+  const date = issuedAt || nowBR();
+  const moduleName = trackTitle || 'Trilha Dynamic';
+  const code = certificateCode(moduleName, date);
+  const logoUrl = 'https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222876/pin-d-pos_nmdij0.png';
+  const dynamicLogo = 'https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222463/pin-d_negativo_1_1_tezunv.png';
+
   const html = `
-    <html><head><title>Certificado Dynamic</title>
-    <style>
-      body{font-family:Arial,sans-serif;background:#f4f7ff;padding:40px;color:#08245c}
-      .cert{background:white;border:10px solid #053798;border-radius:24px;padding:60px;text-align:center;max-width:900px;margin:auto}
-      h1{font-size:44px;margin:0;color:#053798}.seal{font-size:64px}.name{font-size:32px;font-weight:bold;margin:24px 0}
-      p{font-size:18px;line-height:1.6}.track{font-size:28px;font-weight:bold;color:#0a5cff}
-      .footer{margin-top:50px;font-size:14px;color:#68758d}
-    </style></head><body><div class="cert">
-      <div class="seal">🏆</div><h1>Certificado de Conclusão</h1>
-      <p>Certificamos que</p><div class="name">${escapeHtml(name)}</div>
-      <p>concluiu com sucesso a trilha</p><div class="track">${escapeHtml(trackTitle)}</div>
-      <p>pela Academia Dynamic.</p>
-      <div class="footer">Emitido em ${escapeHtml(issuedAt)} • DynamicDoc</div>
-    </div></body></html>`;
+    <!doctype html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="utf-8">
+      <title>Certificado DynamicDoc Academy</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Great+Vibes&display=swap" rel="stylesheet">
+      <style>
+        :root{
+          --blue-dark:#08245c;
+          --blue-menu:#0b347f;
+          --blue-main:#053798;
+          --blue-bright:#0b6cff;
+          --gold:#d8a83a;
+          --paper:#ffffff;
+          --ink:#0c1f4f;
+        }
+        *{box-sizing:border-box}
+        body{
+          margin:0;
+          min-height:100vh;
+          background:#eef3ff;
+          font-family:Inter,Arial,sans-serif;
+          color:var(--ink);
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          padding:28px;
+        }
+        .certificate{
+          width:1120px;
+          min-height:790px;
+          background:
+            radial-gradient(circle at 82% 25%, rgba(11,108,255,.08), transparent 30%),
+            radial-gradient(circle at 8% 95%, rgba(5,55,152,.08), transparent 28%),
+            var(--paper);
+          border:2px solid var(--blue-bright);
+          border-radius:28px;
+          position:relative;
+          overflow:hidden;
+          box-shadow:0 30px 90px rgba(8,36,92,.18);
+          padding:46px 58px 34px;
+        }
+        .certificate:before{
+          content:"";
+          position:absolute;
+          top:-150px;
+          left:-190px;
+          width:460px;
+          height:460px;
+          background:linear-gradient(135deg,var(--blue-dark),var(--blue-main));
+          transform:rotate(45deg);
+          border-radius:60px;
+          box-shadow:0 20px 45px rgba(5,55,152,.35);
+        }
+        .certificate:after{
+          content:"";
+          position:absolute;
+          right:-140px;
+          bottom:-160px;
+          width:400px;
+          height:400px;
+          background:linear-gradient(135deg,var(--blue-bright),var(--blue-dark));
+          transform:rotate(45deg);
+          border-radius:56px;
+        }
+        .corner-logo{
+          position:absolute;
+          top:40px;
+          left:45px;
+          width:145px;
+          height:145px;
+          object-fit:contain;
+          z-index:2;
+          filter:drop-shadow(0 16px 24px rgba(0,0,0,.28));
+        }
+        .watermark{
+          position:absolute;
+          right:80px;
+          top:130px;
+          width:390px;
+          opacity:.055;
+          z-index:1;
+        }
+        .content{
+          position:relative;
+          z-index:3;
+          text-align:center;
+        }
+        .brand-title{
+          font-size:44px;
+          font-weight:900;
+          letter-spacing:-.05em;
+          color:var(--blue-dark);
+          margin-top:5px;
+        }
+        .brand-title span{color:var(--blue-bright);font-weight:500}
+        .academy-label{
+          margin-top:8px;
+          letter-spacing:.34em;
+          font-size:13px;
+          font-weight:800;
+          color:var(--blue-main);
+          text-transform:uppercase;
+        }
+        .main-title{
+          margin:34px 0 0;
+          font-size:62px;
+          line-height:1;
+          letter-spacing:.10em;
+          font-weight:900;
+          color:var(--blue-dark);
+          text-transform:uppercase;
+        }
+        .subtitle{
+          margin:15px auto 32px;
+          color:var(--blue-bright);
+          font-size:22px;
+          letter-spacing:.32em;
+          font-weight:800;
+          text-transform:uppercase;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:18px;
+        }
+        .subtitle:before,.subtitle:after{content:"";width:100px;height:2px;background:var(--blue-bright)}
+        .intro{font-size:17px;margin:0 0 6px;color:#344161}
+        .student-name{
+          font-family:'Great Vibes',cursive;
+          font-size:72px;
+          line-height:1.05;
+          color:var(--blue-dark);
+          margin:8px 0 14px;
+        }
+        .course-text{font-size:17px;color:#344161;margin:0}
+        .course-name{
+          font-size:34px;
+          color:var(--blue-bright);
+          font-weight:900;
+          letter-spacing:.05em;
+          text-transform:uppercase;
+          margin:12px 0 14px;
+        }
+        .description{
+          max-width:690px;
+          margin:0 auto 28px;
+          font-size:16px;
+          line-height:1.55;
+          color:#344161;
+        }
+        .seal{
+          position:absolute;
+          left:92px;
+          top:315px;
+          width:140px;
+          height:140px;
+          border-radius:50%;
+          background:linear-gradient(145deg,#f8df80,#bd861c);
+          display:grid;
+          place-items:center;
+          box-shadow:0 14px 34px rgba(5,55,152,.22);
+          z-index:4;
+        }
+        .seal:before{
+          content:"";
+          position:absolute;
+          inset:15px;
+          border-radius:50%;
+          background:linear-gradient(135deg,var(--blue-dark),var(--blue-bright));
+          border:3px solid rgba(255,255,255,.45);
+        }
+        .seal img{position:relative;z-index:2;width:72px;height:72px;object-fit:contain}
+        .seal-ribbons{
+          position:absolute;
+          left:118px;
+          top:435px;
+          z-index:2;
+          display:flex;
+          gap:8px;
+        }
+        .seal-ribbons span{display:block;width:35px;height:95px;background:var(--blue-dark);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)}
+        .seal-ribbons span:last-child{background:var(--blue-main)}
+        .info-row{
+          width:690px;
+          margin:22px auto 46px;
+          background:#fff;
+          border:1px solid rgba(8,36,92,.10);
+          border-radius:14px;
+          box-shadow:0 13px 35px rgba(8,36,92,.12);
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          overflow:hidden;
+        }
+        .info-item{padding:18px 16px;border-right:1px solid #e5eaf5}
+        .info-item:last-child{border-right:0}
+        .info-item b{display:block;font-size:12px;color:var(--blue-main);text-transform:uppercase;margin-bottom:7px}
+        .info-item span{font-size:16px;color:var(--blue-dark)}
+        .bottom{
+          display:grid;
+          grid-template-columns:1fr 1fr 1fr;
+          gap:24px;
+          align-items:end;
+          margin-top:6px;
+          text-align:left;
+        }
+        .signature{text-align:left;padding-left:115px}
+        .signature .sign{
+          font-family:'Great Vibes',cursive;
+          font-size:38px;
+          color:var(--blue-dark);
+          border-bottom:2px solid var(--blue-bright);
+          padding-bottom:2px;
+          display:inline-block;
+          min-width:230px;
+        }
+        .signature b{display:block;margin-top:10px;color:var(--blue-main)}
+        .signature small{color:#344161}
+        .congrats{text-align:center;color:var(--blue-main);font-weight:900}
+        .congrats small{display:block;color:#344161;font-weight:500;line-height:1.4;margin-top:6px}
+        .verify{text-align:left;display:flex;gap:14px;align-items:center}
+        .qr{
+          width:86px;height:86px;border-radius:10px;border:3px solid var(--blue-bright);
+          background:
+            linear-gradient(90deg,#111 10px,transparent 10px) 0 0/20px 20px,
+            linear-gradient(#111 10px,transparent 10px) 0 0/20px 20px,
+            #fff;
+          opacity:.85;
+        }
+        .verify b{color:var(--blue-main);display:block;text-transform:uppercase;font-size:15px}
+        .verify small{font-size:11px;color:#344161}
+        .code{
+          position:absolute;
+          bottom:0;
+          left:50%;
+          transform:translateX(-50%);
+          background:var(--blue-dark);
+          color:#fff;
+          border-radius:18px 18px 0 0;
+          padding:14px 56px 13px;
+          text-align:center;
+          z-index:4;
+          border:2px solid var(--gold);
+          border-bottom:0;
+        }
+        .code small{display:block;letter-spacing:.12em;text-transform:uppercase;font-weight:800;font-size:11px;color:#dce7ff}
+        .code b{font-size:18px;letter-spacing:.08em}
+        .actions{position:fixed;right:24px;bottom:24px;display:flex;gap:10px;z-index:20}
+        .actions button{border:0;border-radius:12px;padding:12px 18px;font-weight:800;cursor:pointer;background:var(--blue-main);color:white;box-shadow:0 12px 30px rgba(8,36,92,.22)}
+        .actions button.secondary{background:white;color:var(--blue-main)}
+        @media print{
+          body{background:white;padding:0}.certificate{box-shadow:none;border-radius:0;width:100vw;min-height:100vh;border:0}.actions{display:none}
+        }
+      </style>
+    </head>
+    <body>
+      <div class="certificate">
+        <img class="corner-logo" src="${logoUrl}" alt="Dynamic">
+        <img class="watermark" src="${logoUrl}" alt="">
+        <div class="seal-ribbons"><span></span><span></span></div>
+        <div class="seal"><img src="${dynamicLogo}" alt="D"></div>
+        <div class="content">
+          <div class="brand-title">dynamic<span>travel</span></div>
+          <div class="academy-label">DynamicDoc Academy</div>
+          <h1 class="main-title">Certificado</h1>
+          <div class="subtitle">de conclusão</div>
+          <p class="intro">Certificamos que</p>
+          <div class="student-name">${escapeHtml(name)}</div>
+          <p class="course-text">concluiu com êxito a trilha de aprendizagem</p>
+          <div class="course-name">${escapeHtml(moduleName)}</div>
+          <p class="description">Demonstrando conhecimento dos processos, funcionalidades e boas práticas relacionadas ao módulo concluído na Academia Dynamic.</p>
+
+          <div class="info-row">
+            <div class="info-item"><b>Nível</b><span>Básico</span></div>
+            <div class="info-item"><b>Carga horária</b><span>Conforme trilha</span></div>
+            <div class="info-item"><b>Data de conclusão</b><span>${escapeHtml(date)}</span></div>
+            <div class="info-item"><b>Conclusão</b><span>100%</span></div>
+          </div>
+
+          <div class="bottom">
+            <div class="signature">
+              <div class="sign">Nathalia Araujo</div>
+              <b>Nathalia Araujo</b>
+              <small>Gestão Dynamic Travel</small>
+            </div>
+            <div class="congrats">
+              ★ ★ ★<br>PARABÉNS!
+              <small>Seu empenho transforma conhecimento em excelência.</small>
+            </div>
+            <div class="verify">
+              <div class="qr"></div>
+              <div><b>Verifique a autenticidade</b><small>Escaneie o QR Code ou valide pelo DynamicDoc.<br>${escapeHtml(code)}</small></div>
+            </div>
+          </div>
+        </div>
+        <div class="code"><small>Código de certificado</small><b>${escapeHtml(code)}</b></div>
+      </div>
+      <div class="actions"><button onclick="window.print()">Baixar / imprimir PDF</button><button class="secondary" onclick="window.close()">Fechar</button></div>
+    </body></html>`;
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
-  win.print();
 }
 
 
