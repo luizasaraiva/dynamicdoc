@@ -423,3 +423,56 @@
   font-size:12px;
   line-height:1.25;
 }
+
+
+/* Ajuste Academia: remove sobreposição dos itens de aula */
+.track-cover {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+.track-icon {
+  display: none !important;
+}
+.academy-stat-card span {
+  display: none !important;
+}
+.academy-lesson {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  row-gap: 3px !important;
+  min-height: 50px;
+}
+.academy-lesson input {
+  display: none !important;
+}
+.academy-lesson span {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  width: 28px !important;
+  height: 28px !important;
+  align-self: center !important;
+}
+.academy-lesson b {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+  line-height: 1.25 !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+.academy-lesson small {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  margin-top: 0 !important;
+  display: block !important;
+  line-height: 1.25 !important;
+  white-space: normal !important;
+  color: var(--muted) !important;
+}
+.track-meta span {
+  white-space: nowrap;
+}
