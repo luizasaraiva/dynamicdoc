@@ -214,19 +214,9 @@ function renderCards(){
 function renderArticles(){ $('articlesList').innerHTML = filteredArticles('article').map(articleCard).join('') || '<p class="muted">Nenhum artigo encontrado.</p>'; }
 
 function processSearchText(a){
-  const sysName = db.systems.find(s => s.id === a.system)?.name || '';
-  const modName = db.modules.find(m => m.id === a.module)?.name || '';
-  return normalize([
-    a.title,
-    a.summary,
-    a.content,
-    a.department,
-    a.system,
-    a.module,
-    sysName,
-    modName,
-    ...(a.tags || [])
-  ].join(' '));
+  // Pesquisa dos processos internos limitada somente ao resumo do artigo.
+  // Não considera título, módulo, sistema, departamento, OBT, tags ou conteúdo.
+  return normalize(a.summary || '');
 }
 
 function searchTerms(value){
