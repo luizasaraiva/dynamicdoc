@@ -61,25 +61,38 @@ async function fetchTable(table, select='*'){
 }
 
 function normalizeArticle(a){
+  const tags = Array.isArray(a.tags)
+    ? a.tags
+    : (typeof a.tags === 'string' ? a.tags.split(',').map(t=>t.trim()).filter(Boolean) : []);
+
+  const kind = a.kind || a.tipo_conteudo || a.tipo || (a.visibility === 'interno' || a.visibilidade === 'interno' ? 'process' : 'article');
+  const visibility = a.visibility || a.visibilidade || (kind === 'process' ? 'interno' : 'publico');
+
   return {
     ...a,
     id: a.id || uid(),
-    kind: a.kind || 'article',
-    visibility: a.visibility || (a.kind === 'process' ? 'interno' : 'publico'),
+    kind,
+    visibility,
+    title: a.title || a.titulo || a.nome || 'Sem título',
+    summary: a.summary || a.resumo || a.descricao || '',
+    content: a.content || a.conteudo || a.corpo || '',
     status: a.status || 'publicado',
-    module: a.module || a.module_id || '',
+    system: a.system || a.sistema || a.system_id || '',
+    module: a.module || a.modulo || a.module_id || '',
     department: a.department || a.departamento || 'suporte',
-    tags: Array.isArray(a.tags) ? a.tags : [],
+    tags,
     comments: Array.isArray(a.comments) ? a.comments : [],
     versions: Array.isArray(a.versions) ? a.versions : [],
-    internalNote: a.internalNote || a.internal_note || '',
-    file: a.file || '',
-    version: a.version || '1.0',
-    views: Number(a.views || 0),
+    internalNote: a.internalNote || a.internal_note || a.observacao_interna || '',
+    image: a.image || a.imagem || '',
+    video: a.video || '',
+    file: a.file || a.arquivo || '',
+    version: a.version || a.versao || '1.0',
+    views: Number(a.views || a.visualizacoes || 0),
     likes: Number(a.likes || 0),
     dislikes: Number(a.dislikes || 0),
-    createdAt: a.createdAt || a.created_at || nowBR(),
-    updatedAt: a.updatedAt || a.updated_at || nowBR()
+    createdAt: a.createdAt || a.created_at || a.criado_em || nowBR(),
+    updatedAt: a.updatedAt || a.updated_at || a.atualizado_em || nowBR()
   };
 }
 
@@ -200,8 +213,32 @@ function renderCards(){
 }
 function renderArticles(){ $('articlesList').innerHTML = filteredArticles('article').map(articleCard).join('') || '<p class="muted">Nenhum artigo encontrado.</p>'; }
 
+function processSearchText(a){
+  const sysName = db.systems.find(s => s.id === a.system)?.name || '';
+  const modName = db.modules.find(m => m.id === a.module)?.name || '';
+  return normalize([
+    a.title,
+    a.summary,
+    a.content,
+    a.department,
+    a.system,
+    a.module,
+    sysName,
+    modName,
+    ...(a.tags || [])
+  ].join(' '));
+}
+
+function searchTerms(value){
+  return normalize(value)
+    .split(/\s+/)
+    .map(t => t.trim())
+    .filter(t => t.length >= 2);
+}
+
 function processContents(){
-  const term = (($('processSearch') && $('processSearch').value) || '').toLowerCase().trim();
+  const term = (($('processSearch') && $('processSearch').value) || '').trim();
+  const terms = searchTerms(term);
   const system = ($('processSystem') && $('processSystem').value) || '';
   const module = ($('processModule') && $('processModule').value) || '';
   const status = ($('processStatus') && $('processStatus').value) || 'publicado';
@@ -212,17 +249,21 @@ function processContents(){
     .filter(a => !module || a.module === module)
     .filter(a => !status || a.status === status)
     .filter(a => {
-      if (!term) return true;
-      const sysName = db.systems.find(s => s.id === a.system)?.name || '';
-      const modName = db.modules.find(m => m.id === a.module)?.name || '';
-      const haystack = [a.title, a.summary, a.content, a.department, sysName, modName, ...(a.tags || [])].join(' ').toLowerCase();
-      return haystack.includes(term);
+      if (!terms.length) return true;
+      const text = processSearchText(a);
+      // Todas as palavras digitadas precisam aparecer no artigo.
+      // Assim, ao pesquisar um tema, só ficam os processos realmente relacionados.
+      return terms.every(t => text.includes(t));
     });
 }
 
 function renderProcesses(){
   const list = processContents();
-  $('processList').innerHTML = list.map(articleCard).join('') || '<p class="muted">Nenhum processo interno encontrado.</p>';
+  const term = (($('processSearch') && $('processSearch').value) || '').trim();
+  const empty = term
+    ? `<p class="muted">Nenhum processo interno encontrado para "${term}".</p>`
+    : '<p class="muted">Nenhum processo interno encontrado.</p>';
+  $('processList').innerHTML = list.map(articleCard).join('') || empty;
 }
 
 function articleCard(a){
@@ -300,7 +341,10 @@ function bindEvents(){
   document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
   $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
   ['articleSearch','filterSystem','filterModule','filterStatus'].forEach(id=>$(id)?.addEventListener('input',renderArticles));
-  ['processSearch','processSystem','processModule','processStatus'].forEach(id=>$(id)?.addEventListener('input',renderProcesses));
+  ['processSearch','processSystem','processModule','processStatus'].forEach(id=>{
+    $(id)?.addEventListener('input',renderProcesses);
+    $(id)?.addEventListener('change',renderProcesses);
+  });
   $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
   $('articleSystem').addEventListener('change',updateModuleOptions); $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
