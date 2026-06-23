@@ -15,7 +15,7 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark"><img src="https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222876/pin-d-pos_nmdij0.png" alt="DynamicDoc" onerror="this.style.display='none';this.parentElement.textContent='D'"></div>
+        <div class="brand-mark"><img src="https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222463/pin-d_negativo_1_1_tezunv.png" alt="DynamicDoc" onerror="this.style.display='none';this.parentElement.textContent='D'"></div>
         <div><h1>DynamicDoc</h1><p>Portal Corporativo</p></div>
       </div>
       <nav class="menu">
@@ -74,7 +74,7 @@
             <div><label>Tipo</label><select id="articleVisibility"><option value="publico">Público/Cliente</option><option value="interno">Interno/Colaborador</option></select></div>
           </div>
           <label>Resumo</label><textarea id="articleSummary" rows="2" placeholder="Resumo do conteúdo"></textarea>
-          <label>Conteúdo</label><textarea id="articleContent" rows="10" placeholder="Passo a passo, orientações, regras, links..."></textarea>
+          <label>Conteúdo</label><div id="articleContent" class="rich-editor" contenteditable="true" data-placeholder="Passo a passo, orientações, regras, links..."></div>
           <div class="form-grid"><div><label>Tags separadas por vírgula</label><input id="articleTags" type="text" placeholder="argo, cadastro, aprovação"></div><div><label>Imagem (URL)</label><input id="articleImage" type="url" placeholder="https://..."></div><div><label>Vídeo (URL)</label><input id="articleVideo" type="url" placeholder="https://..."></div><div><label>Arquivo/PDF (URL)</label><input id="articleFile" type="url" placeholder="https://..."></div></div>
           <label>Observação interna</label><textarea id="articleInternalNote" rows="3" placeholder="Visível apenas para colaboradores"></textarea>
           <div class="editor-actions"><button class="primary-btn" id="saveArticleBtn">Salvar conteúdo</button><button class="ghost-btn" id="duplicateArticleBtn">Duplicar como nova versão</button></div>
@@ -111,4 +111,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
