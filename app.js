@@ -292,7 +292,86 @@ function renderFavorites(){
   $('historyList').innerHTML=hist.map(a=>`<p><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button> ${a.title}</p>`).join('')||'<p class="muted">Nenhum histórico.</p>';
 }
 function renderAcademy(){
-  $('academyGrid').innerHTML=db.tracks.map(t=>`<div class="track-card"><h3>${t.title}</h3><p class="muted">${t.description}</p><div class="progress"><div style="width:${t.progress||0}%"></div></div><strong>${t.progress||0}% concluído</strong>${(t.lessons||[]).map((l,i)=>`<div class="lesson"><input type="checkbox" ${i < Math.round((t.progress||0)/100*t.lessons.length)?'checked':''} onchange="updateTrack('${t.id}')"> ${l}</div>`).join('')}</div>`).join('');
+  const tracks = db.tracks || [];
+  const totalTracks = tracks.length;
+  const totalLessons = tracks.reduce((sum,t)=>sum + ((t.lessons||[]).length),0);
+  const avgProgress = totalTracks ? Math.round(tracks.reduce((sum,t)=>sum + Number(t.progress||0),0) / totalTracks) : 0;
+  const completedTracks = tracks.filter(t => Number(t.progress||0) >= 100);
+  const certificates = completedTracks.map(t => t.title);
+
+  if($('academyOverallProgress')) $('academyOverallProgress').textContent = `${avgProgress}%`;
+  if($('academyOverallBar')) $('academyOverallBar').style.width = `${avgProgress}%`;
+  if($('academyTrackCount')) $('academyTrackCount').textContent = totalTracks;
+  if($('academyStats')){
+    $('academyStats').innerHTML = [
+      {icon:'📚', n: totalTracks, t:'Trilhas'},
+      {icon:'🎥', n: totalLessons, t:'Aulas'},
+      {icon:'🏆', n: certificates.length, t:'Certificados'},
+      {icon:'⚡', n: `${avgProgress}%`, t:'Progresso'}
+    ].map(s=>`<div class="academy-stat-card"><span>${s.icon}</span><strong>${s.n}</strong><small>${s.t}</small></div>`).join('');
+  }
+
+  if($('academyCertificatesText')){
+    $('academyCertificatesText').textContent = certificates.length ? `${certificates.length} certificado(s) emitido(s).` : 'Conclua uma trilha para emitir seu primeiro certificado.';
+  }
+  if($('academyCertificates')){
+    $('academyCertificates').innerHTML = certificates.length
+      ? certificates.map(c=>`<div class="certificate-line">✓ ${c}</div>`).join('')
+      : '<div class="certificate-line muted">Em andamento</div>';
+  }
+
+  const firstInProgress = tracks.find(t => Number(t.progress||0) < 100) || tracks[0];
+  if($('academyFeaturedLesson')){
+    const lesson = firstInProgress?.lessons?.[0] || 'Selecione uma trilha para continuar.';
+    $('academyFeaturedLesson').textContent = firstInProgress ? `${firstInProgress.title} • ${lesson}` : lesson;
+  }
+
+  $('academyGrid').innerHTML = tracks.map(t=>{
+    const lessons = t.lessons || [];
+    const progress = Number(t.progress || 0);
+    const completedLessons = Math.round((progress/100) * lessons.length);
+    const status = progress >= 100 ? 'Concluído' : progress > 0 ? 'Em andamento' : 'Não iniciado';
+    const buttonText = progress >= 100 ? 'Revisar' : progress > 0 ? 'Continuar' : 'Começar';
+
+    return `
+      <article class="academy-track-card">
+        <div class="track-cover">
+          <span class="track-icon">${trackIcon(t.title)}</span>
+          <span class="track-status">${status}</span>
+        </div>
+        <div class="track-body">
+          <h3>${t.title}</h3>
+          <p>${t.description || 'Trilha de aprendizagem Dynamic.'}</p>
+          <div class="track-meta">
+            <span>🎥 ${lessons.length} aulas</span>
+            <span>${progress}% concluído</span>
+          </div>
+          <div class="progress academy-track-progress"><div style="width:${progress}%"></div></div>
+          <div class="lesson-list">
+            ${lessons.map((l,i)=>`
+              <label class="academy-lesson ${i < completedLessons ? 'done' : ''}">
+                <input type="checkbox" ${i < completedLessons ? 'checked' : ''} onchange="updateTrack('${t.id}')">
+                <span>${i < completedLessons ? '✓' : i+1}</span>
+                <b>${l}</b>
+              </label>
+            `).join('')}
+          </div>
+          <button class="primary-btn full track-action" onclick="updateTrack('${t.id}')">${buttonText}</button>
+        </div>
+      </article>
+    `;
+  }).join('') || '<div class="empty-state">Nenhuma trilha cadastrada ainda.</div>';
+}
+
+function trackIcon(title=''){
+  const t = normalize(title);
+  if(t.includes('argo')) return '✈️';
+  if(t.includes('reserve')) return '🏨';
+  if(t.includes('expense') || t.includes('relatorio')) return '📊';
+  if(t.includes('onboarding')) return '🚀';
+  if(t.includes('wts')) return '🌐';
+  if(t.includes('reserva')) return '🧳';
+  return '🎓';
 }
 function updateTrack(id){const t=db.tracks.find(x=>x.id===id); t.progress=Math.min(100,(t.progress||0)+25); saveDb(); renderAcademy();}
 function addTrack(){const title=prompt('Nome da trilha:'); if(!title) return; db.tracks.unshift({id:uid(),title,description:'Nova trilha de aprendizagem.',lessons:['Aula 1','Aula 2','Avaliação'],progress:0}); saveDb(); renderAcademy();}
