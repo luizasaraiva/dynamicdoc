@@ -1,1208 +1,222 @@
+const $ = (id) => document.getElementById(id);
+const nowBR = () => new Date().toLocaleString('pt-BR');
+const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
+
 const initialData = {
-  systems: [
-    { id: 'argo', name: 'Argo', description: 'Artigos sobre cadastro, reservas, políticas, aprovações e fluxos do Argo.' },
-    { id: 'reserve', name: 'Reserve', description: 'Guias de uso, erros comuns, configurações e consultas do Reserve.' },
-    { id: 'wts', name: 'WTS', description: 'Procedimentos, orientações e base de apoio para atendimento WTS.' },
-    { id: 'reserva-facil', name: 'Reserva Fácil', description: 'Conteúdos para operação e suporte do Reserva Fácil.' }
+  systems:[
+    {id:'argo',name:'Argo',description:'Cadastros, reservas, políticas, aprovações, emissões e relatórios.'},
+    {id:'reserve',name:'Reserve',description:'Configurações, consultas, erros comuns e operação.'},
+    {id:'wts',name:'WTS',description:'Procedimentos e apoio para atendimento WTS.'},
+    {id:'reserva-facil',name:'Reserva Fácil',description:'Conteúdos operacionais e suporte.'},
+    {id:'expense',name:'Expense',description:'Prestação de contas, despesas, relatórios e reembolsos.'}
   ],
-  departments: [
-    { id: 'suporte', name: 'Suporte', description: 'Conteúdos para atendimento, troubleshooting e resolução de chamados.' },
-    { id: 'financeiro', name: 'Financeiro', description: 'Processos financeiros, faturamento, conferências e orientações.' },
-    { id: 'eventos', name: 'Eventos', description: 'Fluxos e materiais de apoio para eventos e grupos.' },
-    { id: 'operacao', name: 'Operação', description: 'Procedimentos operacionais, execução e acompanhamento.' }
+  departments:[
+    {id:'suporte',name:'Suporte'}, {id:'financeiro',name:'Financeiro'}, {id:'eventos',name:'Eventos'}, {id:'operacao',name:'Operação'}, {id:'rh',name:'RH'}
   ],
-  modules: [
-    { id: 'argo-cadastros', system: 'argo', name: 'Cadastros' },
-    { id: 'argo-aprovacoes', system: 'argo', name: 'Aprovações' },
-    { id: 'argo-politicas', system: 'argo', name: 'Políticas' },
-    { id: 'reserve-cadastros', system: 'reserve', name: 'Cadastros' },
-    { id: 'reserve-emissoes', system: 'reserve', name: 'Emissões' },
-    { id: 'wts-operacao', system: 'wts', name: 'Operação' },
-    { id: 'reserva-facil-pesquisa', system: 'reserva-facil', name: 'Pesquisa' }
+  modules:[
+    {id:'argo-cadastros',system:'argo',name:'Cadastros'}, {id:'argo-aprovacoes',system:'argo',name:'Aprovações'}, {id:'argo-politicas',system:'argo',name:'Políticas'}, {id:'argo-relatorios',system:'argo',name:'Relatórios'},
+    {id:'reserve-cadastros',system:'reserve',name:'Cadastros'}, {id:'reserve-emissoes',system:'reserve',name:'Emissões'}, {id:'expense-despesas',system:'expense',name:'Despesas'},
+    {id:'wts-operacao',system:'wts',name:'Operação'}, {id:'reserva-facil-pesquisa',system:'reserva-facil',name:'Pesquisa'}
   ],
-  clients: [
-    { id: crypto.randomUUID(), name: 'Mariana Costa', email: 'mariana.costa@empresa.com', company: 'Empresa Modelo', role: 'usuário comum' },
-    { id: crypto.randomUUID(), name: 'Rafael Lima', email: 'rafael.lima@cliente.com', company: 'Cliente Exemplo', role: 'usuário comum' }
+  users:[
+    {id:uid(),name:'Luiza Saraiva',email:'luiza.saraiva@dynamictravel.com',role:'admin',department:'suporte'},
+    {id:uid(),name:'Gestor de Conteúdo',email:'conteudo@dynamictravel.com',role:'gestor',department:'suporte'},
+    {id:uid(),name:'Equipe Eventos',email:'eventos@dynamictravel.com',role:'colaborador',department:'eventos'}
   ],
-  agencyUsers: [
-    { id: crypto.randomUUID(), name: 'Luiza Saraiva', email: 'luiza.saraiva@dynamictravel.com', department: 'Suporte', access: 'administrador' },
-    { id: crypto.randomUUID(), name: 'Equipe Eventos', email: 'eventos@dynamictravel.com', department: 'Eventos', access: 'colaborador' }
+  articles:[
+    {id:uid(),kind:'article',visibility:'publico',title:'Cadastro de usuários no Argo',summary:'Passo a passo para orientar o cadastro e validação de usuários no Argo.',system:'argo',module:'argo-cadastros',department:'suporte',status:'publicado',tags:['cadastro','usuário','argo','login'],content:'1. Acesse o painel administrativo do cliente.\n2. Localize a área de usuários.\n3. Confira nome, e-mail e perfil de acesso.\n4. Valide centro de custo, empresa, comunidade e permissões.\n5. Salve o cadastro e oriente o primeiro acesso.',image:'',video:'',file:'',internalNote:'Conferir sempre o link correto do cliente antes de validar erro de acesso.',version:'1.0',versions:[],comments:[],views:12,likes:0,dislikes:0,createdAt:nowBR(),updatedAt:nowBR()},
+    {id:uid(),kind:'article',visibility:'publico',title:'Diferença entre solicitação, reserva e emissão',summary:'Explica as principais etapas de uma viagem no OBT.',system:'argo',module:'argo-aprovacoes',department:'suporte',status:'publicado',tags:['solicitação','reserva','emissão'],content:'Solicitação é o pedido inicial. Reserva é quando o item foi selecionado e bloqueado. Emissão é a confirmação final com bilhete/voucher emitido. Em caso de dúvidas, consulte status, histórico e logs da solicitação.',image:'',video:'',file:'',internalNote:'Bom artigo para clientes novos.',version:'1.0',versions:[],comments:[],views:8,likes:0,dislikes:0,createdAt:nowBR(),updatedAt:nowBR()},
+    {id:uid(),kind:'process',visibility:'interno',title:'Fluxo interno de atendimento para eventos',summary:'Modelo de consulta para equipes que atendem eventos e grupos.',system:'wts',module:'wts-operacao',department:'eventos',status:'publicado',tags:['eventos','operação','wts'],content:'Antes de iniciar o atendimento, confirme período, localidade, solicitante, tipo de evento e quantidade de participantes. Registre todas as etapas para manter visibilidade entre Suporte, Operação, Comercial e Gestão.',image:'',video:'',file:'',internalNote:'Utilizar em onboarding de novos colaboradores de Eventos.',version:'1.0',versions:[],comments:[],views:5,likes:0,dislikes:0,createdAt:nowBR(),updatedAt:nowBR()}
   ],
-  articles: [
-    {
-      id: crypto.randomUUID(),
-      title: 'Cadastro de usuários no Argo',
-      summary: 'Passo a passo para orientar o processo de cadastro e validação de usuários no Argo.',
-      system: 'argo',
-      department: 'suporte',
-      status: 'publicado',
-      tags: ['cadastro', 'usuário', 'argo', 'login'],
-      image: '',
-      video: '',
-      content: '1. Acesse o painel administrativo do cliente.\n2. Localize a área de usuários.\n3. Confira nome, e-mail e perfil de acesso.\n4. Valide se o usuário está vinculado ao centro de custo correto.\n5. Salve o cadastro e oriente o usuário sobre o primeiro acesso.',
-      createdAt: new Date().toLocaleDateString('pt-BR'),
-      updatedAt: new Date().toLocaleDateString('pt-BR'),
-      comments: [],
-      kind: 'article'
-    },
-    {
-      id: crypto.randomUUID(),
-      title: 'Como identificar erro de acesso',
-      summary: 'Orientação rápida para analisar login incorreto, link errado ou perfil sem permissão.',
-      system: 'reserve',
-      department: 'suporte',
-      status: 'publicado',
-      tags: ['login', 'acesso', 'erro', 'reserve'],
-      image: '',
-      video: '',
-      content: 'Confira se o link utilizado pertence ao cliente correto. Depois valide se o usuário está ativo, se o perfil possui permissão e se a senha foi redefinida recentemente. Caso o acesso continue falhando, registre evidências e acione o responsável pelo sistema.',
-      createdAt: new Date().toLocaleDateString('pt-BR'),
-      updatedAt: new Date().toLocaleDateString('pt-BR'),
-      comments: [],
-      kind: 'article'
-    },
-    {
-      id: crypto.randomUUID(),
-      title: 'Fluxo de atendimento para eventos',
-      summary: 'Modelo de consulta para equipes que atendem demandas de eventos e grupos.',
-      system: 'wts',
-      department: 'eventos',
-      status: 'publicado',
-      tags: ['eventos', 'operação', 'wts'],
-      image: '',
-      video: '',
-      content: 'Antes de iniciar o atendimento, confirme período, localidade, solicitante, tipo de evento e quantidade de participantes. Registre todas as etapas para manter visibilidade entre Suporte, Operação e Gestão.',
-      createdAt: new Date().toLocaleDateString('pt-BR'),
-      updatedAt: new Date().toLocaleDateString('pt-BR'),
-      comments: []
-    }
+  favorites:[], history:[], searchLogs:[],
+  tracks:[
+    {id:uid(),title:'Trilha Argo Básico',description:'Fundamentos do Argo para novos colaboradores.',lessons:['Visão geral do Argo','Cadastros','Aprovações','Reservas e emissões'],progress:50},
+    {id:uid(),title:'Onboarding Dynamic',description:'Conteúdos iniciais para chegada de novos colaboradores.',lessons:['Quem somos','Sistemas internos','Canais de atendimento','Boas práticas'],progress:25},
+    {id:uid(),title:'Expense e Relatórios',description:'Prestação de contas, despesas e consultas gerenciais.',lessons:['Expense básico','Despesas','Relatórios','Erros comuns'],progress:0}
   ]
 };
 
-let db = JSON.parse(localStorage.getItem('dynamicdoc-db')) || initialData;
-db.clients = db.clients || initialData.clients;
-db.agencyUsers = db.agencyUsers || initialData.agencyUsers;
-db.modules = db.modules || initialData.modules || [];
-db.articles = (db.articles || []).map(a => ({ kind: a.kind || 'article', comments: a.comments || [], likes: 0, dislikes: 0, version: '1.0', homologation: 'homologado', history: [], module: a.module || a.module_id || '', ...a }));
-db.favorites = db.favorites || [];
-db.portalBanner = db.portalBanner || '';
-let currentUser = JSON.parse(localStorage.getItem('dynamicdoc-user')) || null;
-
-const supabaseSettings = window.DynamicDocSupabase || {};
-const supabaseReady = Boolean(
-  supabaseSettings.url &&
-  supabaseSettings.anonKey &&
-  !supabaseSettings.url.includes('SEU-PROJETO') &&
-  !supabaseSettings.anonKey.includes('SUA-CHAVE') &&
-  window.supabase
-);
-const supabaseDb = supabaseReady ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey) : null;
+let db = JSON.parse(localStorage.getItem('dynamicdoc-product-db') || 'null') || initialData;
+for (const k of Object.keys(initialData)) db[k] = db[k] || initialData[k];
+let currentUser = JSON.parse(localStorage.getItem('dynamicdoc-product-user') || 'null');
 let selectedArticleId = null;
 let editorReturnPage = 'articles';
-let selectedProcessSystem = '';
+const saveDb = () => localStorage.setItem('dynamicdoc-product-db', JSON.stringify(db));
+const saveUser = () => currentUser ? localStorage.setItem('dynamicdoc-product-user', JSON.stringify(currentUser)) : localStorage.removeItem('dynamicdoc-product-user');
 
-const $ = (id) => document.getElementById(id);
-const saveDb = () => localStorage.setItem('dynamicdoc-db', JSON.stringify(db));
+const supabaseSettings = window.DynamicDocSupabase || {};
+const supabaseReady = Boolean(window.supabase && supabaseSettings.url && supabaseSettings.anonKey && !supabaseSettings.url.includes('SEU-PROJETO'));
+const supabaseDb = supabaseReady ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey) : null;
 
-async function loadSupabaseData() {
-  if (!supabaseDb) return;
-
-  const [articlesRes, clientsRes, agencyRes, modulesRes] = await Promise.all([
-    supabaseDb.from('artigos').select('*').order('updatedAt', { ascending: false }),
-    supabaseDb.from('clientes').select('*').order('name', { ascending: true }),
-    supabaseDb.from('profiles').select('*').in('perfil', ['admin','colaborador']).order('nome', { ascending: true }),
-    supabaseDb.from('modulos').select('*').order('name', { ascending: true })
-  ]);
-
-  if (articlesRes.error) console.warn('Erro ao carregar artigos do Supabase:', articlesRes.error.message);
-  if (clientsRes.error) console.warn('Erro ao carregar clientes do Supabase:', clientsRes.error.message);
-  if (agencyRes.error) console.warn('Erro ao carregar usuários agência do Supabase:', agencyRes.error.message);
-  if (modulesRes?.error) console.warn('Erro ao carregar módulos do Supabase:', modulesRes.error.message);
-
-  if (articlesRes.data?.length) {
-    db.articles = articlesRes.data.map(a => ({
-      ...a,
-      tags: Array.isArray(a.tags) ? a.tags : [],
-      comments: Array.isArray(a.comments) ? a.comments : [],
-      kind: a.kind || 'article'
-    }));
-  }
-  if (clientsRes.data?.length) db.clients = clientsRes.data;
-  if (agencyRes.data?.length) {
-    db.agencyUsers = agencyRes.data.map(user => ({
-      id: user.id,
-      name: user.nome,
-      email: user.email,
-      department: user.departamento,
-      access: user.perfil
-    }));
-  }
-  if (modulesRes?.data?.length) db.modules = modulesRes.data;
-  saveDb();
-}
-
-async function upsertSupabase(table, payload) {
-  if (!supabaseDb) return;
-  const { error } = await supabaseDb.from(table).upsert(payload, { onConflict: 'id' });
-  if (error) {
-    console.error(`Erro ao salvar em ${table}:`, error.message);
-    alert(`Salvo localmente, mas houve erro ao sincronizar com Supabase: ${error.message}`);
-  }
-}
-
-async function deleteSupabase(table, id) {
-  if (!supabaseDb) return;
-  const { error } = await supabaseDb.from(table).delete().eq('id', id);
-  if (error) {
-    console.error(`Erro ao excluir em ${table}:`, error.message);
-    alert(`Excluído localmente, mas houve erro ao sincronizar com Supabase: ${error.message}`);
-  }
-}
-const saveUser = () => localStorage.setItem('dynamicdoc-user', JSON.stringify(currentUser));
-
-async function getLoggedUser() {
-  if (!supabaseDb) return null;
-  const { data: sessionData, error: sessionError } = await supabaseDb.auth.getSession();
-  if (sessionError) {
-    console.warn('Erro ao recuperar sessão:', sessionError.message);
-    return null;
-  }
-  const authUser = sessionData?.session?.user;
-  if (!authUser) return null;
-
-  const { data: profile, error: profileError } = await supabaseDb
-    .from('profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.warn('Erro ao carregar perfil:', profileError.message);
-    return null;
-  }
-
-  if (!profile) {
-    return { id: authUser.id, name: authUser.email, email: authUser.email, role: 'usuario', department: 'Sem departamento', company: '' };
-  }
-
-  return {
-    id: profile.id,
-    name: profile.nome || authUser.email,
-    email: profile.email || authUser.email,
-    role: profile.perfil || 'usuario',
-    department: profile.departamento || 'Sem departamento',
-    company: profile.empresa || ''
-  };
-}
-
-async function loginWithSupabase(email, password) {
-  if (!supabaseDb) {
-    alert('Supabase não conectado. Confira o arquivo supabase-config.js.');
-    return false;
-  }
-  const { error } = await supabaseDb.auth.signInWithPassword({ email, password });
-  if (error) {
-    alert('Erro no login: ' + error.message);
-    return false;
-  }
-  currentUser = await getLoggedUser();
-  if (!currentUser) {
-    alert('Login realizado, mas o perfil do usuário não foi encontrado. Confira a tabela profiles.');
-    return false;
-  }
-  if (!['admin', 'colaborador'].includes(currentUser.role)) {
-    await supabaseDb.auth.signOut();
-    currentUser = null;
-    localStorage.removeItem('dynamicdoc-user');
-    alert('Este login é restrito para usuários corporativos e administradores.');
-    return false;
-  }
-  saveUser();
-  refresh();
-  navigate('home');
-  return true;
-}
-
-async function logoutSupabase() {
-  if (supabaseDb) await supabaseDb.auth.signOut();
-  currentUser = null;
-  localStorage.removeItem('dynamicdoc-user');
-  refresh();
-  navigate('home');
-}
-
-async function resetPasswordSupabase(email) {
-  if (!supabaseDb) {
-    alert('Supabase não conectado.');
-    return;
-  }
-  const { error } = await supabaseDb.auth.resetPasswordForEmail(email);
-  if (error) return alert('Erro ao enviar redefinição: ' + error.message);
-  alert('Se o e-mail estiver cadastrado, enviaremos um link de redefinição.');
-}
-const systemName = (id) => db.systems.find(s => s.id === id)?.name || id;
-const deptName = (id) => db.departments.find(d => d.id === id)?.name || id;
+const isStaff = () => ['colaborador','gestor','admin'].includes(currentUser?.role);
+const canManageContent = () => ['gestor','admin'].includes(currentUser?.role);
 const isAdmin = () => currentUser?.role === 'admin';
-const canSuggest = () => ['admin', 'colaborador'].includes(currentUser?.role);
-const canSeeInternalProcesses = () => ['admin', 'colaborador'].includes(currentUser?.role);
-const isCommonUser = () => !currentUser || currentUser.role === 'usuario';
-
-function updateAccessView() {
-  $('currentUserName').textContent = currentUser?.name || 'Visitante';
-  $('currentUserRole').textContent = currentUser ? `${currentUser.role} • ${currentUser.department}` : 'Faça login';
-  $('loginBtn').textContent = currentUser ? 'Sair' : 'Entrar';
-  $('loginBtn').classList.remove('hidden');
-  document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
-  document.querySelectorAll('.staff-only').forEach(el => el.classList.toggle('hidden', !canSeeInternalProcesses()));
-  document.querySelectorAll('.dept-menu').forEach(el => el.classList.toggle('hidden', isCommonUser()));
-  if (!isAdmin() && document.querySelector('#admin.active-page')) navigate('home');
-  if (!canSeeInternalProcesses() && document.querySelector('#processes.active-page')) navigate('home');
-  if (isCommonUser() && document.querySelector('#departments.active-page')) navigate('home');
-}
-
-
-function slugify(text) {
-  return String(text || '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '') || crypto.randomUUID();
-}
-
-function modulesBySystem(systemId) {
-  return (db.modules || []).filter(m => m.system === systemId).sort((a,b) => a.name.localeCompare(b.name));
-}
-
-function moduleName(moduleId) {
-  const m = (db.modules || []).find(item => item.id === moduleId || item.name === moduleId);
-  return m?.name || moduleId || 'Sem módulo';
-}
-
-function updateModuleSelect(selectedValue = '') {
-  const select = $('formModule');
-  if (!select) return;
-  const system = $('formSystem')?.value || '';
-  const modules = modulesBySystem(system);
-  select.innerHTML = modules.length
-    ? '<option value="">Selecione um módulo</option>' + modules.map(m => `<option value="${m.id}">${m.name}</option>`).join('')
-    : '<option value="">Nenhum módulo cadastrado para este sistema</option>';
-  if (selectedValue) select.value = selectedValue;
-}
-
-function fillModuleAdminSelect() {
-  if ($('newModuleSystem')) {
-    $('newModuleSystem').innerHTML = db.systems.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  }
-}
-
-async function addModule() {
-  if (!isAdmin()) return alert('Apenas administradores podem criar módulos.');
-  const system = $('newModuleSystem')?.value;
-  const name = $('newModuleName')?.value.trim();
-  if (!system || !name) return alert('Selecione o sistema e informe o nome do módulo.');
-  const exists = (db.modules || []).some(m => m.system === system && m.name.toLowerCase() === name.toLowerCase());
-  if (exists) return alert('Este módulo já existe para o sistema selecionado.');
-  const payload = { id: `${system}-${slugify(name)}`, system, name };
-  db.modules.unshift(payload);
-  saveDb();
-  await upsertSupabase('modulos', payload);
-  $('newModuleName').value = '';
-  fillSelects();
-  renderProcesses();
-}
-
-function fillSelects() {
-  const systemOptions = '<option value="">Todos os sistemas</option>' + db.systems.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  const deptOptions = '<option value="">Todos os departamentos</option>' + db.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-  $('filterSystem').innerHTML = systemOptions;
-  $('filterDepartment').innerHTML = deptOptions;
-  if ($('formSystem')) $('formSystem').innerHTML = db.systems.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  if ($('formDepartment')) $('formDepartment').innerHTML = db.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-  fillModuleAdminSelect();
-  updateModuleSelect($('formModule')?.value || '');
-}
-
-function renderCards() {
-  const systemCards = db.systems.map(s => `
-    <article class="card" onclick="filterBySystem('${s.id}')">
-      <div class="card-icon">${s.name.charAt(0)}</div>
-      <h4>${s.name}</h4>
-      <p>${s.description}</p>
-      <div class="meta"><span class="tag">${countArticles('system', s.id)} artigos</span></div>
-    </article>
-  `).join('');
-  $('systemCards').innerHTML = systemCards;
-  $('systemsPageGrid').innerHTML = systemCards;
-
-  $('departmentsGrid').innerHTML = db.departments.map(d => `
-    <article class="card" onclick="filterByDepartment('${d.id}')">
-      <div class="card-icon">${d.name.charAt(0)}</div>
-      <h4>${d.name}</h4>
-      <p>${d.description}</p>
-      <div class="meta"><span class="tag">${countArticles('department', d.id)} artigos</span></div>
-    </article>
-  `).join('');
-}
-
-function countArticles(type, id) {
-  return db.articles.filter(a => (a.kind || 'article') === 'article' && a[type] === id && (isAdmin() || a.status === 'publicado')).length;
-}
-
-function renderArticles(targetId = 'articlesList', limit = null) {
-  const query = (targetId === 'recentArticles' ? $('globalSearch').value : $('articleSearch')?.value || '').toLowerCase();
-  const system = $('filterSystem')?.value || '';
-  const department = $('filterDepartment')?.value || '';
-  const status = isAdmin() ? ($('filterStatus')?.value ?? 'publicado') : 'publicado';
-
-  let articles = db.articles.filter(a => {
-    if ((a.kind || 'article') !== 'article') return false;
-    const text = `${a.title} ${a.summary} ${a.tags.join(' ')} ${systemName(a.system)} ${deptName(a.department)}`.toLowerCase();
-    return (!query || text.includes(query)) &&
-      (!system || a.system === system) &&
-      (!department || a.department === department) &&
-      (!status || a.status === status) &&
-      (isAdmin() || a.status === 'publicado');
-  });
-
-  if (limit) articles = articles.slice(0, limit);
-
-  const html = articles.length ? articles.map(a => `
-    <article class="article-item">
-      <div>
-        <h4>${a.title}</h4>
-        <p>${a.summary}</p>
-        <div class="meta">
-          <span class="tag">${systemName(a.system)}</span>
-          <span class="tag">${deptName(a.department)}</span>
-          <span class="tag status ${a.status}">${a.status}</span>
-          ${a.tags.slice(0, 3).map(t => `<span class="tag">#${t}</span>`).join('')}
-        </div>
-      </div>
-      <div class="article-actions">
-        <button class="ghost-btn" onclick="openArticle('${a.id}')">Abrir</button>
-        ${canSeeInternalProcesses() && targetId === 'articlesList' ? `<button class="ghost-btn" onclick="editArticle('${a.id}')">Editar</button>${isAdmin() ? `<button class="danger-btn" onclick="deleteArticle('${a.id}')">Excluir</button>` : ''}` : ''}
-      </div>
-    </article>
-  `).join('') : '<div class="panel"><p class="muted">Nenhum artigo encontrado.</p></div>';
-
-  $(targetId).innerHTML = html;
-}
-
-function renderAdminArticles() {
-  $('adminArticles').innerHTML = db.articles.filter(a => (a.kind || 'article') === 'article').map(a => `
-    <article class="article-item">
-      <div>
-        <h4>${a.title}</h4>
-        <p>${systemName(a.system)} • ${moduleName(a.module)} • ${deptName(a.department)} • ${a.status}</p>
-      </div>
-      <div class="top-actions">
-        <button class="ghost-btn" onclick="selectArticleForComment('${a.id}')">Selecionar</button>
-        <button class="ghost-btn" onclick="openArticle('${a.id}')">Visualizar</button>
-      </div>
-    </article>
-  `).join('');
-}
-
-function selectArticleForComment(id) {
-  selectedArticleId = id;
-  renderComments();
-}
-
-
-function isHtmlContent(content = '') {
-  return /<[^>]+>/.test(content);
-}
-
-function formatContentForDisplay(content = '') {
-  if (!content) return '<p>Conteúdo em construção.</p>';
-  if (isHtmlContent(content)) return content;
-  return content
-    .split(/\n+/)
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(line => `<p>${line}</p>`)
-    .join('');
-}
-
-function setEditorContent(content = '') {
-  const editor = $('formContent');
-  if (!editor) return;
-  editor.innerHTML = isHtmlContent(content) ? content : formatContentForDisplay(content);
-}
-
-function getEditorContent() {
-  const editor = $('formContent');
-  if (!editor) return '';
-  return editor.innerHTML.trim();
-}
-
-function focusEditor() {
-  const editor = $('formContent');
-  if (editor) editor.focus();
-}
-
-function applyEditorCommand(command, value = null) {
-  focusEditor();
-  document.execCommand(command, false, value);
-}
-
-function insertEditorLink() {
-  const url = prompt('Cole o link que deseja inserir:');
-  if (!url) return;
-  applyEditorCommand('createLink', url);
-}
-
-function insertEditorImage() {
-  const url = prompt('Cole a URL da imagem:');
-  if (!url) return;
-  applyEditorCommand('insertImage', url);
-}
-
-function insertEditorVideo() {
-  const url = prompt('Cole o link do vídeo:');
-  if (!url) return;
-  focusEditor();
-  document.execCommand('insertHTML', false, `<div class="doc-video"><strong>Vídeo de apoio:</strong><br><a href="${url}" target="_blank">Abrir vídeo</a></div>`);
-}
-
-function openArticle(id) {
-  const a = db.articles.find(item => item.id === id);
-  if (!a) return;
-  selectedArticleId = id;
-  $('articleDetails').innerHTML = `
-    <span class="pill" style="background:#e8f1ff;color:#053798">${systemName(a.system)} • ${moduleName(a.module)} • ${deptName(a.department)}</span>
-    <h1>${a.title}</h1>
-    <p class="muted">Atualizado em ${a.updatedAt} • Status: ${a.status}</p>
-    ${a.image ? `<img class="article-cover" src="${a.image}" alt="Imagem do artigo">` : ''}
-    <p><strong>${a.summary}</strong></p>
-    <div class="article-body">${formatContentForDisplay(a.content)}</div>
-    ${a.video ? `<div class="video-box"><strong>Vídeo de apoio:</strong><br><a href="${a.video}" target="_blank">Abrir vídeo</a></div>` : ''}
-    <div class="meta">${a.tags.map(t => `<span class="tag">#${t}</span>`).join('')}</div>
-    ${canSuggest() && !isAdmin() ? `<hr><button class="ghost-btn" onclick="alert('Sugestão registrada para revisão administrativa. Esta função está simulada neste protótipo.')">Sugerir alteração</button>` : ''}
-    <div class="article-bottom-actions">
-      <button class="primary-btn" onclick="closeArticleModal()">Fechar artigo</button>
-    </div>
-  `;
-  $('articleModal').classList.remove('hidden');
-}
-
-function closeArticleModal() {
-  $('articleModal').classList.add('hidden');
-}
-
-function editArticle(id) {
-  const a = db.articles.find(item => item.id === id);
-  selectedArticleId = id;
-  editorReturnPage = (a.kind || 'article') === 'process' ? 'processes' : 'articles';
-  $('articleId').value = a.id;
-  if ($('formKind')) $('formKind').value = a.kind || 'article';
-  $('formTitle').value = a.title;
-  $('formSummary').value = a.summary;
-  $('formSystem').value = a.system;
-  updateModuleSelect(a.module || '');
-  $('formDepartment').value = a.department;
-  $('formStatus').value = a.status;
-  $('formTags').value = a.tags.join(', ');
-  $('formImage').value = a.image || '';
-  $('formVideo').value = a.video || '';
-  setEditorContent(a.content);
-  renderComments();
-  $('articleEditorTitle').textContent = (a.kind || 'article') === 'process' ? 'Editar processo interno' : 'Editar artigo';
-  navigate('articleEditor');
-}
-
-async function deleteArticle(id) {
-  if (!confirm('Deseja excluir este artigo?')) return;
-  db.articles = db.articles.filter(a => a.id !== id);
-  saveDb();
-  await deleteSupabase('artigos', id);
-  refresh();
-  navigate(editorReturnPage || 'articles');
-}
-
-
-function renderComments() {
-  const a = db.articles.find(item => item.id === selectedArticleId);
-  $('commentsBox').innerHTML = a?.comments?.length
-    ? a.comments.map(c => `<div class="comment"><strong>${c.author}</strong> • ${c.date}<br>${c.text}</div>`).join('')
-    : '<p class="muted">Nenhum comentário administrativo selecionado.</p>';
-}
-
-async function saveArticle() {
-  const id = $('articleId').value || crypto.randomUUID();
-  const payload = {
-    id,
-    title: $('formTitle').value.trim() || 'Artigo sem título',
-    summary: $('formSummary').value.trim() || 'Resumo não informado.',
-    system: $('formSystem').value,
-    module: $('formModule')?.value || '',
-    department: $('formDepartment').value,
-    status: $('formStatus').value,
-    tags: $('formTags').value.split(',').map(t => t.trim()).filter(Boolean),
-    image: $('formImage').value.trim(),
-    video: $('formVideo').value.trim(),
-    content: getEditorContent() || '<p>Conteúdo em construção.</p>',
-    createdAt: new Date().toLocaleDateString('pt-BR'),
-    updatedAt: new Date().toLocaleDateString('pt-BR'),
-    comments: db.articles.find(a => a.id === id)?.comments || [],
-    kind: $('formKind')?.value || 'article'
-  };
-  const index = db.articles.findIndex(a => a.id === id);
-  if (index >= 0) db.articles[index] = { ...db.articles[index], ...payload, createdAt: db.articles[index].createdAt };
-  else db.articles.unshift(payload);
-  selectedArticleId = id;
-  saveDb();
-  await upsertSupabase('artigos', payload);
-  clearForm();
-  refresh();
-  navigate(editorReturnPage || 'articles');
-}
-
-function clearForm() {
-  ['articleId','formTitle','formSummary','formTags','formImage','formVideo'].forEach(id => $(id).value = '');
-  setEditorContent('');
-  if ($('formStatus')) $('formStatus').value = 'publicado';
-  if ($('formSystem')) $('formSystem').selectedIndex = 0;
-  updateModuleSelect();
-  if ($('formDepartment')) $('formDepartment').selectedIndex = 0;
-  if ($('articleEditorTitle')) $('articleEditorTitle').textContent = 'Novo artigo';
-  if ($('formKind')) $('formKind').value = 'article';
-  selectedArticleId = null;
-  renderComments();
-}
-
-async function addComment() {
-  if (!selectedArticleId) return alert('Selecione um artigo para comentar.');
-  const text = $('adminComment').value.trim();
-  if (!text) return;
-  const a = db.articles.find(item => item.id === selectedArticleId);
-  a.comments.unshift({ text, author: currentUser?.name || 'Administrador', date: new Date().toLocaleString('pt-BR') });
-  $('adminComment').value = '';
-  saveDb();
-  await upsertSupabase('artigos', a);
-  renderComments();
-}
-
-
-function renderArticleChart() {
-  const chart = $('articlesChart');
-  if (!chart) return;
-  const counts = db.systems.map(system => ({
-    name: system.name,
-    count: db.articles.filter(article => (article.kind || 'article') === 'article' && article.system === system.id).length
-  }));
-  const max = Math.max(1, ...counts.map(item => item.count));
-  chart.innerHTML = counts.map(item => `
-    <div class="chart-row">
-      <div class="chart-label">${item.name}</div>
-      <div class="chart-track">
-        <div class="chart-bar" style="width:${Math.max(8, (item.count / max) * 100)}%"></div>
-      </div>
-      <strong>${item.count}</strong>
-    </div>
-  `).join('');
-}
-
-function renderClients() {
-  $('clientsTable').innerHTML = db.clients.map(c => `
-    <tr>
-      <td>${c.name}</td>
-      <td>${c.email}</td>
-      <td>${c.company}</td>
-      <td><span class="role-badge">${c.role}</span></td>
-      <td><button class="small-btn" onclick="resetPassword('cliente', '${c.email}')">Reset de senha</button></td>
-    </tr>
-  `).join('') || '<tr><td colspan="5">Nenhum cliente cadastrado.</td></tr>';
-}
-
-function renderAgencyUsers() {
-  $('agencyTable').innerHTML = db.agencyUsers.map(u => `
-    <tr>
-      <td>${u.name}</td>
-      <td>${u.email}</td>
-      <td>${u.department}</td>
-      <td><span class="role-badge">${u.access}</span></td>
-      <td><button class="small-btn" onclick="resetPassword('agência', '${u.email}')">Reset de senha</button></td>
-    </tr>
-  `).join('') || '<tr><td colspan="5">Nenhum usuário agência cadastrado.</td></tr>';
-}
-
-async function addClient() {
-  const name = $('clientName').value.trim();
-  const email = $('clientEmail').value.trim();
-  const company = $('clientCompany').value.trim();
-  if (!name || !email || !company) return alert('Preencha nome, e-mail e empresa do cliente.');
-  const payload = { id: crypto.randomUUID(), name, email, company, role: 'usuário comum' };
-  db.clients.unshift(payload);
-  ['clientName','clientEmail','clientCompany'].forEach(id => $(id).value = '');
-  saveDb();
-  await upsertSupabase('clientes', payload);
-  renderClients();
-}
-
-async function addAgencyUser() {
-  const name = $('agencyName').value.trim();
-  const email = $('agencyEmail').value.trim();
-  const department = $('agencyDepartment').value;
-  const access = $('agencyAccess').value;
-  if (!name || !email) return alert('Preencha nome e e-mail do usuário agência.');
-  const payload = { id: crypto.randomUUID(), name, email, department, access };
-  db.agencyUsers.unshift(payload);
-  ['agencyName','agencyEmail'].forEach(id => $(id).value = '');
-  saveDb();
-  await upsertSupabase('usuarios_agencia', payload);
-  renderAgencyUsers();
-  renderArticleChart();
-  renderProcesses();
-}
-
-function renderProcesses(systemFilter = selectedProcessSystem) {
-  const container = $('processList');
-  const cards = $('processCards');
-  if (!container || !cards) return;
-  selectedProcessSystem = systemFilter || '';
-  cards.innerHTML = db.systems.map(s => {
-    const count = db.articles.filter(a => (a.kind || 'article') === 'process' && a.system === s.id && (isAdmin() || a.status === 'publicado')).length;
-    return `<button class="process-filter-card ${selectedProcessSystem === s.id ? 'active' : ''}" onclick="selectProcessSystem('${s.id}')"><strong>${s.name}</strong><span>${count} processos</span></button>`;
-  }).join('');
-  let processes = db.articles.filter(a => (a.kind || 'article') === 'process' && (isAdmin() || a.status === 'publicado'));
-  if (selectedProcessSystem) processes = processes.filter(a => a.system === selectedProcessSystem);
-  container.innerHTML = processes.length ? processes.map(a => `
-    <article class="process-row" onclick="openArticle('${a.id}')">
-      <div>
-        <strong>${a.title}</strong>
-        <p>${a.summary}</p>
-        <div class="meta"><span class="tag">${systemName(a.system)}</span><span class="tag">${deptName(a.department)}</span><span class="tag status ${a.status}">${a.status}</span></div>
-      </div>
-      <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${a.id}')">Abrir</button>
-    </article>
-  `).join('') : '<div class="panel"><p class="muted">Nenhum processo interno cadastrado para este filtro.</p></div>';
-}
-
-function selectProcessSystem(id) {
-  selectedProcessSystem = selectedProcessSystem === id ? '' : id;
-  renderProcesses();
-}
-
-function newArticle(kind = 'article') {
-  clearForm();
-  editorReturnPage = kind === 'process' ? 'processes' : 'articles';
-  if ($('formKind')) $('formKind').value = kind;
-  if ($('formStatus')) $('formStatus').value = 'publicado';
-  $('articleEditorTitle').textContent = kind === 'process' ? 'Novo processo interno' : 'Novo artigo';
-  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos que aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
-  navigate('articleEditor');
-}
-
-
-async function resetPassword(type, email) {
-  await resetPasswordSupabase(email);
-}
-
-function navigate(page) {
-  if (page === 'admin' && !isAdmin()) page = 'home';
-  if (page === 'articleEditor' && !canSeeInternalProcesses()) page = 'articles';
-  if (page === 'processes' && !canSeeInternalProcesses()) page = 'home';
-  if (page === 'departments' && isCommonUser()) page = 'home';
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
-  $(page).classList.add('active-page');
-  document.querySelectorAll('.nav-link').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
-  const titles = { access: 'Acesso restrito', home: 'Base de conhecimento', articles: 'Artigos', favorites: 'Favoritos', systems: 'Sistemas', departments: 'Departamentos', processes: 'Processos internos', admin: 'Administração', articleEditor: $('formKind')?.value === 'process' ? ($('articleId')?.value ? 'Editar processo interno' : 'Criar processo interno') : ($('articleId')?.value ? 'Editar artigo' : 'Criar artigo') };
-  $('pageTitle').textContent = titles[page];
-  document.body.classList.toggle('access-mode', page === 'access');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function filterBySystem(id) {
-  navigate('articles');
-  $('filterSystem').value = id;
-  renderArticles();
-}
-function filterByDepartment(id) {
-  navigate('articles');
-  $('filterDepartment').value = id;
-  renderArticles();
-}
-
-function refresh() {
-  updateAccessView();
-  fillSelects();
-  renderCards();
-  renderArticles('recentArticles', 3);
-  renderArticles('articlesList');
-  renderAdminArticles();
-  renderClients();
-  renderAgencyUsers();
-  renderArticleChart();
-  renderProcesses();
-}
-
-function renderProcesses(systemFilter = selectedProcessSystem) {
-  const container = $('processList');
-  const cards = $('processCards');
-  if (!container || !cards) return;
-  selectedProcessSystem = systemFilter || '';
-  cards.innerHTML = db.systems.map(s => {
-    const count = db.articles.filter(a => (a.kind || 'article') === 'process' && a.system === s.id && (isAdmin() || a.status === 'publicado')).length;
-    return `<button class="process-filter-card ${selectedProcessSystem === s.id ? 'active' : ''}" onclick="selectProcessSystem('${s.id}')"><strong>${s.name}</strong><span>${count} processos</span></button>`;
-  }).join('');
-  let processes = db.articles.filter(a => (a.kind || 'article') === 'process' && (isAdmin() || a.status === 'publicado'));
-  if (selectedProcessSystem) processes = processes.filter(a => a.system === selectedProcessSystem);
-  container.innerHTML = processes.length ? processes.map(a => `
-    <article class="process-row" onclick="openArticle('${a.id}')">
-      <div>
-        <strong>${a.title}</strong>
-        <p>${a.summary}</p>
-        <div class="meta"><span class="tag">${systemName(a.system)}</span><span class="tag">${deptName(a.department)}</span><span class="tag status ${a.status}">${a.status}</span></div>
-      </div>
-      <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${a.id}')">Abrir</button>
-    </article>
-  `).join('') : '<div class="panel"><p class="muted">Nenhum processo interno cadastrado para este filtro.</p></div>';
-}
-
-function selectProcessSystem(id) {
-  selectedProcessSystem = selectedProcessSystem === id ? '' : id;
-  renderProcesses();
-}
-
-function newArticle(kind = 'article') {
-  clearForm();
-  editorReturnPage = kind === 'process' ? 'processes' : 'articles';
-  if ($('formKind')) $('formKind').value = kind;
-  if ($('formStatus')) $('formStatus').value = 'publicado';
-  $('articleEditorTitle').textContent = kind === 'process' ? 'Novo processo interno' : 'Novo artigo';
-  if ($('articleEditorDescription')) $('articleEditorDescription').textContent = kind === 'process' ? 'Cadastre processos internos que aparecerão somente na tela Processos internos.' : 'Cadastre ou edite conteúdos da base de conhecimento DynamicDoc.';
-  navigate('articleEditor');
-}
-
-
-
-// ===== Melhorias MVP: dashboard, favoritos, busca ampla, avaliações, relacionados e processos simplificados =====
-function articleText(a) {
-  return `${a.title || ''} ${a.summary || ''} ${a.content || ''} ${(a.tags || []).join(' ')} ${systemName(a.system)} ${deptName(a.department)} ${(a.history || []).map(h => h.text).join(' ')}`.toLowerCase();
-}
-
-function visibleArticles(kind = 'article') {
-  return db.articles.filter(a => (a.kind || 'article') === kind && (isAdmin() || a.status === 'publicado'));
-}
-
-function renderDashboard() {
-  const el = $('dashboardStats');
-  if (!el) return;
-  const articles = visibleArticles('article').length;
-  const processes = visibleArticles('process').length;
-  const systems = db.systems.length;
-  const last = db.articles[0]?.updatedAt || new Date().toLocaleDateString('pt-BR');
-  el.innerHTML = `
-    <article class="stat-card"><strong>${articles}</strong><span>Artigos publicados</span></article>
-    <article class="stat-card"><strong>${processes}</strong><span>Processos internos</span></article>
-    <article class="stat-card"><strong>${systems}</strong><span>Sistemas cadastrados</span></article>
-    <article class="stat-card"><strong>${last}</strong><span>Última atualização</span></article>
-  `;
-}
-
-function renderPortalBanner() {
-  const banner = $('portalBanner');
-  if (!banner) return;
-  banner.classList.toggle('hidden', !db.portalBanner);
-  banner.innerHTML = db.portalBanner ? `<strong>⚠️ Aviso:</strong> ${db.portalBanner}` : '';
-  if ($('portalBannerInput')) $('portalBannerInput').value = db.portalBanner || '';
-}
-
-function toggleFavorite(id) {
-  db.favorites = db.favorites || [];
-  db.favorites = db.favorites.includes(id) ? db.favorites.filter(f => f !== id) : [...db.favorites, id];
-  saveDb();
-  renderArticles('articlesList');
-  renderArticles('recentArticles', 3);
-  renderFavorites();
-}
-
-function renderFavorites() {
-  const el = $('favoritesList');
-  if (!el) return;
-  const favs = visibleArticles('article').filter(a => (db.favorites || []).includes(a.id));
-  el.innerHTML = favs.length ? favs.map(articleRow).join('') : '<div class="panel"><p class="muted">Nenhum favorito marcado ainda. Clique na estrela de um artigo para salvar aqui.</p></div>';
-}
-
-function rateArticle(id, type) {
-  const a = db.articles.find(item => item.id === id);
-  if (!a) return;
-  if (type === 'like') a.likes = (a.likes || 0) + 1;
-  if (type === 'dislike') a.dislikes = (a.dislikes || 0) + 1;
-  saveDb();
-  upsertSupabase('artigos', a);
-  openArticle(id);
-}
-
-function articlesRelatedTo(article) {
-  const tags = article.tags || [];
-  return visibleArticles(article.kind || 'article')
-    .filter(a => a.id !== article.id)
-    .map(a => ({
-      ...a,
-      score: (a.system === article.system ? 2 : 0) + (a.department === article.department ? 1 : 0) + (a.tags || []).filter(t => tags.includes(t)).length
-    }))
-    .filter(a => a.score > 0)
-    .sort((a,b) => b.score - a.score)
-    .slice(0, 3);
-}
-
-function articleRow(a) {
-  const fav = (db.favorites || []).includes(a.id);
-  return `
-    <article class="article-item">
-      <div>
-        <h4>${a.title}</h4>
-        <p>${a.summary}</p>
-        <div class="meta">
-          <span class="tag">${systemName(a.system)}</span>
-          <span class="tag">${deptName(a.department)}</span>
-          <span class="tag status ${a.status}">${a.status}</span>
-          ${(a.tags || []).slice(0, 4).map(t => `<button class="tag clickable-tag" onclick="searchTag('${t}')">#${t}</button>`).join('')}
-        </div>
-      </div>
-      <div class="article-actions">
-        <button class="ghost-btn" onclick="toggleFavorite('${a.id}')">${fav ? '★' : '☆'} Favorito</button>
-        <button class="ghost-btn" onclick="openArticle('${a.id}')">Abrir</button>
-        ${canSeeInternalProcesses() && (a.kind || 'article') === 'article' ? `<button class="ghost-btn" onclick="editArticle('${a.id}')">Editar</button>${isAdmin() ? `<button class="danger-btn" onclick="deleteArticle('${a.id}')">Excluir</button>` : ''}` : ''}
-      </div>
-    </article>
-  `;
-}
-
-function searchTag(tag) {
-  navigate('articles');
-  $('articleSearch').value = tag;
-  renderArticles('articlesList');
-}
-
-function renderArticles(targetId = 'articlesList', limit = null) {
-  const query = (targetId === 'recentArticles' ? ($('globalSearch')?.value || '') : ($('articleSearch')?.value || '')).toLowerCase();
-  const system = $('filterSystem')?.value || '';
-  const department = $('filterDepartment')?.value || '';
-  const status = isAdmin() ? ($('filterStatus')?.value ?? 'publicado') : 'publicado';
-  let articles = db.articles.filter(a => {
-    if ((a.kind || 'article') !== 'article') return false;
-    return (!query || articleText(a).includes(query)) &&
-      (!system || a.system === system) &&
-      (!department || a.department === department) &&
-      (!status || a.status === status) &&
-      (isAdmin() || a.status === 'publicado');
-  });
-  articles = articles.sort((a,b) => (db.favorites || []).includes(b.id) - (db.favorites || []).includes(a.id));
-  if (limit) articles = articles.slice(0, limit);
-  $(targetId).innerHTML = articles.length ? articles.map(articleRow).join('') : '<div class="panel"><p class="muted">Nenhum artigo encontrado.</p></div>';
-}
-
-function openArticle(id) {
-  const a = db.articles.find(item => item.id === id);
-  if (!a) return;
-  selectedArticleId = id;
-  const related = articlesRelatedTo(a);
-  const history = a.history?.length ? a.history.slice(0, 4).map(h => `<li>${h.date} — ${h.text}</li>`).join('') : `<li>${a.updatedAt || a.createdAt} — Versão inicial publicada.</li>`;
-  $('articleDetails').innerHTML = `
-    <span class="pill" style="background:#e8f1ff;color:#053798">${systemName(a.system)} • ${moduleName(a.module)} • ${deptName(a.department)}</span>
-    <h1>${a.title}</h1>
-    <p class="muted">Atualizado em ${a.updatedAt} • Versão ${a.version || '1.0'} • Status: ${a.status}</p>
-    ${isAdmin() ? `<p><span class="tag status ${a.homologation || 'homologado'}">${a.homologation || 'homologado'}</span></p>` : ''}
-    ${a.image ? `<img class="article-cover" src="${a.image}" alt="Imagem do artigo">` : ''}
-    <p><strong>${a.summary}</strong></p>
-    <div class="article-body">${formatContentForDisplay(a.content)}</div>
-    ${a.video ? `<div class="video-box"><strong>Vídeo de apoio:</strong><br><a href="${a.video}" target="_blank">Abrir vídeo</a></div>` : ''}
-    <div class="meta">${(a.tags || []).map(t => `<button class="tag clickable-tag" onclick="closeArticleModal(); searchTag('${t}')">#${t}</button>`).join('')}</div>
-    <div class="feedback-box"><strong>Este artigo ajudou?</strong><button class="ghost-btn" onclick="rateArticle('${a.id}','like')">👍 Sim (${a.likes || 0})</button><button class="ghost-btn" onclick="rateArticle('${a.id}','dislike')">👎 Não (${a.dislikes || 0})</button></div>
-    <div class="history-box"><strong>Histórico de atualização</strong><ul>${history}</ul></div>
-    ${related.length ? `<div class="related-box"><strong>Artigos relacionados</strong>${related.map(r => `<button class="related-link" onclick="openArticle('${r.id}')">${r.title}</button>`).join('')}</div>` : ''}
-    ${canSuggest() && !isAdmin() ? `<hr><button class="ghost-btn" onclick="alert('Sugestão registrada para revisão administrativa. Esta função está simulada neste protótipo.')">Sugerir alteração</button>` : ''}
-    <div class="article-bottom-actions"><button class="primary-btn" onclick="closeArticleModal()">Fechar artigo</button></div>
-  `;
-  $('articleModal').classList.remove('hidden');
-}
-
-function escapeHtml(value = '') {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-function processMatchesSearch(article, module, system, query) {
-  if (!query) return true;
-  const text = `${article.title || ''} ${article.summary || ''} ${article.content || ''} ${(article.tags || []).join(' ')} ${module?.name || ''} ${system?.name || ''}`.toLowerCase();
-  return text.includes(query);
-}
-
-function renderProcesses() {
-  const board = $('processBoard');
-  const list = $('processList');
-  const actions = $('processFlowActions');
-  const searchInput = $('processSearch');
-  if (!board || !list) return;
-
-  if (actions) actions.innerHTML = '';
-  list.innerHTML = '';
-
-  const query = (searchInput?.value || '').trim().toLowerCase();
-  const allProcesses = visibleArticles('process');
-
-  const systemsHtml = db.systems.map(system => {
-    const systemProcesses = allProcesses.filter(article => article.system === system.id);
-    if (!systemProcesses.length) return '';
-
-    const modulesWithArticles = modulesBySystem(system.id)
-      .map(module => {
-        const articles = systemProcesses.filter(article => article.module === module.id && processMatchesSearch(article, module, system, query));
-        return { module, articles };
-      })
-      .filter(group => group.articles.length > 0);
-
-    const orphanArticles = systemProcesses.filter(article => {
-      const hasModule = article.module && modulesBySystem(system.id).some(module => module.id === article.module);
-      return !hasModule && processMatchesSearch(article, { name: 'Sem módulo' }, system, query);
-    });
-
-    if (!modulesWithArticles.length && !orphanArticles.length) return '';
-
-    const articleCount = modulesWithArticles.reduce((total, group) => total + group.articles.length, 0) + orphanArticles.length;
-    const moduleCount = modulesWithArticles.length + (orphanArticles.length ? 1 : 0);
-    const openAttr = query ? ' open' : '';
-
-    return `
-      <details class="process-system-group"${openAttr}>
-        <summary class="process-system-summary">
-          <div>
-            <strong>${escapeHtml(system.name)}</strong>
-            <span>${moduleCount} módulos • ${articleCount} artigos</span>
-          </div>
-          <span class="process-chevron">▾</span>
-        </summary>
-        <div class="process-modules-wrap">
-          ${modulesWithArticles.map(({ module, articles }) => `
-            <details class="process-module-group"${openAttr}>
-              <summary class="process-module-summary">
-                <div>
-                  <strong>${escapeHtml(module.name)}</strong>
-                  <span>${articles.length} artigos vinculados</span>
-                </div>
-                <span class="process-chevron">▾</span>
-              </summary>
-              <div class="process-article-list">
-                ${articles.map(article => `
-                  <article class="process-article-row" onclick="openArticle('${article.id}')">
-                    <div>
-                      <strong>${escapeHtml(article.title)}</strong>
-                      <p>${escapeHtml(article.summary || 'Sem resumo cadastrado.')}</p>
-                      <div class="meta">
-                        <span class="tag">${escapeHtml(systemName(article.system))}</span>
-                        <span class="tag">${escapeHtml(moduleName(article.module))}</span>
-                        <span class="tag status ${article.status}">${escapeHtml(article.status || 'publicado')}</span>
-                      </div>
-                    </div>
-                    <div class="article-actions">
-                      <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${article.id}')">Abrir</button>
-                      ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${article.id}')">Editar</button>` : ''}
-                      ${isAdmin() ? `<button class="danger-btn" onclick="event.stopPropagation(); deleteArticle('${article.id}')">Excluir</button>` : ''}
-                    </div>
-                  </article>
-                `).join('')}
-              </div>
-            </details>
-          `).join('')}
-          ${orphanArticles.length ? `
-            <details class="process-module-group"${openAttr}>
-              <summary class="process-module-summary">
-                <div>
-                  <strong>Sem módulo vinculado</strong>
-                  <span>${orphanArticles.length} artigos vinculados</span>
-                </div>
-                <span class="process-chevron">▾</span>
-              </summary>
-              <div class="process-article-list">
-                ${orphanArticles.map(article => `
-                  <article class="process-article-row" onclick="openArticle('${article.id}')">
-                    <div>
-                      <strong>${escapeHtml(article.title)}</strong>
-                      <p>${escapeHtml(article.summary || 'Sem resumo cadastrado.')}</p>
-                    </div>
-                    <div class="article-actions">
-                      <button class="ghost-btn" onclick="event.stopPropagation(); openArticle('${article.id}')">Abrir</button>
-                      ${canSeeInternalProcesses() ? `<button class="ghost-btn" onclick="event.stopPropagation(); editArticle('${article.id}')">Vincular módulo</button>` : ''}
-                      ${isAdmin() ? `<button class="danger-btn" onclick="event.stopPropagation(); deleteArticle('${article.id}')">Excluir</button>` : ''}
-                    </div>
-                  </article>
-                `).join('')}
-              </div>
-            </details>
-          ` : ''}
-        </div>
-      </details>
-    `;
-  }).join('');
-
-  board.innerHTML = systemsHtml.trim() || `<div class="panel"><p class="muted">${query ? 'Nenhum processo encontrado para a pesquisa.' : 'Nenhum processo interno cadastrado ainda.'}</p></div>`;
-}
-
-function saveBanner() {
-  db.portalBanner = $('portalBannerInput').value.trim();
-  saveDb();
-  renderPortalBanner();
-}
-
-function clearBanner() {
-  db.portalBanner = '';
-  saveDb();
-  renderPortalBanner();
-}
-
-function refresh() {
-  updateAccessView();
-  fillSelects();
-  renderCards();
-  renderDashboard();
-  renderPortalBanner();
-  renderArticles('recentArticles', 3);
-  renderArticles('articlesList');
-  renderFavorites();
-  renderAdminArticles();
-  renderClients();
-  renderAgencyUsers();
-  renderArticleChart();
-  renderProcesses();
-}
-
-const originalSaveArticle = saveArticle;
-saveArticle = async function() {
-  const id = $('articleId').value || crypto.randomUUID();
-  const old = db.articles.find(a => a.id === id);
-  await originalSaveArticle();
-  const saved = db.articles.find(a => a.id === id);
-  if (saved) {
-    saved.version = old?.version ? String((parseFloat(old.version) + 0.1).toFixed(1)) : '1.0';
-    saved.history = old?.history || [];
-    saved.history.unshift({ date: new Date().toLocaleDateString('pt-BR'), text: old ? 'Artigo atualizado.' : 'Artigo criado.' });
+const roleLabel = (role) => ({usuario:'Usuário',colaborador:'Colaborador',gestor:'Gestor de Conteúdo',admin:'Administrador'}[role] || 'Visitante');
+const normalize = (v) => (v || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+async function syncFromSupabase(){
+  if(!supabaseDb) return;
+  try{
+    const [a,s,m,u,t] = await Promise.all([
+      supabaseDb.from('articles').select('*'), supabaseDb.from('systems').select('*'), supabaseDb.from('modules').select('*'), supabaseDb.from('profiles').select('*'), supabaseDb.from('training_tracks').select('*')
+    ]);
+    if(a.data?.length) db.articles = a.data.map(x=>({...x,tags:x.tags||[],comments:x.comments||[],versions:x.versions||[]}));
+    if(s.data?.length) db.systems = s.data;
+    if(m.data?.length) db.modules = m.data;
+    if(u.data?.length) db.users = u.data.map(x=>({id:x.id,name:x.name||x.nome,email:x.email,role:x.role||x.perfil,department:x.department||x.departamento}));
+    if(t.data?.length) db.tracks = t.data.map(x=>({...x,lessons:x.lessons||[]}));
     saveDb();
-    await upsertSupabase('artigos', saved);
-  }
-  refresh();
-};
+  }catch(e){console.warn('Supabase offline/local:', e.message)}
+}
+async function upsert(table,payload){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).upsert(payload); if(error) console.warn(error.message); }
+async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
 
-
-document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.page)));
-
-$('loginBtn').addEventListener('click', async () => {
-  if (currentUser) {
-    await logoutSupabase();
-    return;
-  }
-  $('loginPanel').classList.remove('hidden');
-});
-
-$('closeLogin').addEventListener('click', () => $('loginPanel').classList.add('hidden'));
-
-if ($('confirmLogin')) $('confirmLogin').addEventListener('click', async () => {
-  const email = $('loginEmail')?.value.trim();
-  const password = $('loginPassword')?.value.trim();
-  if (!email || !password) return alert('Preencha e-mail e senha.');
-
-  const ok = await loginWithSupabase(email, password);
-  if (ok) {
-    $('loginPanel').classList.add('hidden');
-    $('loginPassword').value = '';
-  }
-});
-
-if ($('forgotPasswordBtn')) $('forgotPasswordBtn').addEventListener('click', async () => {
-  const email = $('loginEmail')?.value.trim();
-  if (!email) return alert('Informe o e-mail para redefinir a senha.');
-  await resetPasswordSupabase(email);
-});
-
-document.querySelectorAll('.access-tab').forEach(btn => btn.addEventListener('click', () => {
-  document.querySelectorAll('.access-tab').forEach(tab => tab.classList.remove('active'));
-  document.querySelectorAll('.access-box').forEach(box => box.classList.remove('active-access-box'));
-  btn.classList.add('active');
-  $(btn.dataset.accessTab).classList.add('active-access-box');
-}));
-
-if ($('accessLoginBtn')) $('accessLoginBtn').addEventListener('click', async () => {
-  const email = $('accessEmail')?.value.trim();
-  const password = $('accessPassword')?.value.trim();
-  if (!email || !password) return alert('Preencha e-mail e senha para acessar.');
-  await loginWithSupabase(email, password);
-});
-
-if ($('recoverBtn')) $('recoverBtn').addEventListener('click', async () => {
-  const email = $('recoverEmail')?.value.trim();
-  if (!email) return alert('Informe o e-mail cadastrado.');
-  await resetPasswordSupabase(email);
-  if ($('recoverMessage')) $('recoverMessage').classList.remove('hidden');
-});
-
-if ($('requestAccessBtn')) $('requestAccessBtn').addEventListener('click', async () => {
-  const name = $('requestName')?.value.trim();
-  const email = $('requestEmail')?.value.trim();
-  const company = $('requestCompany')?.value.trim();
-  if (!name || !email || !company) return alert('Preencha nome, e-mail corporativo e empresa.');
-  const payload = { id: crypto.randomUUID(), name, email, company, role: 'usuário comum' };
-  db.clients.unshift(payload);
-  saveDb();
-  await upsertSupabase('clientes', payload);
-  renderClients();
-  if ($('requestMessage')) $('requestMessage').classList.remove('hidden');
-  ['requestName','requestEmail','requestCompany','requestReason'].forEach(id => { if ($(id)) $(id).value = ''; });
-});
-
-$('closeArticle').addEventListener('click', closeArticleModal);
-$('articleModal').addEventListener('click', (event) => {
-  if (event.target.id === 'articleModal') closeArticleModal();
-});
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !$('articleModal').classList.contains('hidden')) closeArticleModal();
-});
-$('searchBtn').addEventListener('click', () => { navigate('articles'); $('articleSearch').value = $('globalSearch').value; renderArticles(); });
-$('globalSearch').addEventListener('keydown', e => { if (e.key === 'Enter') $('searchBtn').click(); });
-['articleSearch','filterSystem','filterDepartment','filterStatus'].forEach(id => $(id).addEventListener('input', () => renderArticles()));
-$('addComment').addEventListener('click', addComment);
-$('addClient').addEventListener('click', addClient);
-$('addAgencyUser').addEventListener('click', addAgencyUser);
-if ($('saveBannerBtn')) $('saveBannerBtn').addEventListener('click', saveBanner);
-if ($('clearBannerBtn')) $('clearBannerBtn').addEventListener('click', clearBanner);
-$('newArticleBtn').addEventListener('click', () => newArticle('article'));
-$('newProcessBtn').addEventListener('click', () => newArticle('process'));
-$('backToArticlesBtn').addEventListener('click', () => navigate(editorReturnPage || 'articles'));
-$('saveArticle').addEventListener('click', saveArticle);
-$('clearArticleForm').addEventListener('click', clearForm);
-if ($('formSystem')) $('formSystem').addEventListener('change', () => updateModuleSelect());
-if ($('addModuleBtn')) $('addModuleBtn').addEventListener('click', addModule);
-if ($('processSearch')) $('processSearch').addEventListener('input', renderProcesses);
-
-document.querySelectorAll('.doc-toolbar button').forEach(button => {
-  button.addEventListener('click', () => {
-    const command = button.dataset.command;
-    const value = button.dataset.value || null;
-    const action = button.dataset.action;
-    if (command) return applyEditorCommand(command, value);
-    if (action === 'link') return insertEditorLink();
-    if (action === 'image') return insertEditorImage();
-    if (action === 'video') return insertEditorVideo();
-  });
-});
-
-async function startDynamicDoc() {
-  await loadSupabaseData();
-  if (supabaseDb) {
-    currentUser = await getLoggedUser();
-    if (currentUser && ['admin', 'colaborador'].includes(currentUser.role)) saveUser();
-    else {
-      currentUser = null;
-      localStorage.removeItem('dynamicdoc-user');
-    }
-  }
-  refresh();
-  navigate(document.querySelector('.page.active-page')?.id || 'home');
+function applyAccess(){
+  $('currentUserName').textContent = currentUser?.name || 'Visitante';
+  $('currentUserRole').textContent = currentUser ? roleLabel(currentUser.role) : 'Portal público';
+  $('loginBtn').classList.toggle('hidden', !!currentUser);
+  $('logoutBtn').classList.toggle('hidden', !currentUser);
+  document.querySelectorAll('.staff-only').forEach(el=>el.classList.toggle('hidden', !isStaff()));
+  document.querySelectorAll('.content-manager-only').forEach(el=>el.classList.toggle('hidden', !canManageContent()));
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden', !isAdmin()));
 }
 
-startDynamicDoc();
+function navigate(page){
+  if(page==='admin' && !isAdmin()) page='home';
+  if(page==='processes' && !isStaff()) page='home';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));
+  $(page)?.classList.add('active-page');
+  document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
+  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo'};
+  $('pageTitle').textContent = titles[page] || 'DynamicDoc';
+  renderAll(); window.scrollTo(0,0);
+}
 
+function renderAll(){applyAccess(); populateSelects(); renderDashboard(); renderCards(); renderArticles(); renderProcesses(); renderFavorites(); renderAcademy(); renderAdmin();}
+function populateSelects(){
+  const sysOpts = ['<option value="">Todos os sistemas</option>', ...db.systems.map(s=>`<option value="${s.id}">${s.name}</option>`)].join('');
+  ['filterSystem'].forEach(id=>$(id) && ($(id).innerHTML=sysOpts));
+  const sysOnly = db.systems.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ['articleSystem','moduleSystem'].forEach(id=>$(id) && ($(id).innerHTML=sysOnly));
+  const modOpts = ['<option value="">Todos os módulos</option>', ...db.modules.map(m=>`<option value="${m.id}">${m.name}</option>`)].join('');
+  ['filterModule'].forEach(id=>$(id) && ($(id).innerHTML=modOpts));
+  const depOpts = db.departments.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  ['articleDepartment','userDepartment'].forEach(id=>$(id) && ($(id).innerHTML=depOpts));
+  updateModuleOptions();
+}
+function updateModuleOptions(){
+  const sys = $('articleSystem')?.value || db.systems[0]?.id;
+  const mods = db.modules.filter(m=>m.system===sys);
+  if($('articleModule')) $('articleModule').innerHTML = mods.map(m=>`<option value="${m.id}">${m.name}</option>`).join('') || '<option value="">Sem módulo</option>';
+}
+
+function visibleContents(){return db.articles.filter(a => a.status !== 'arquivado' && (a.status==='publicado' || isStaff()) && (a.visibility!=='interno' || isStaff()));}
+function articleMatches(a,q){q=normalize(q); return !q || [a.title,a.summary,a.content,a.system,a.module,a.department,(a.tags||[]).join(' ')].some(v=>normalize(v).includes(q));}
+function filteredArticles(kind='article'){
+  const q = $('articleSearch')?.value || $('globalSearch')?.value || '';
+  const sys = $('filterSystem')?.value || '';
+  const mod = $('filterModule')?.value || '';
+  const st = $('filterStatus')?.value ?? 'publicado';
+  return visibleContents().filter(a => (a.kind||'article')===kind && articleMatches(a,q) && (!sys||a.system===sys) && (!mod||a.module===mod) && (!st||a.status===st));
+}
+
+function renderDashboard(){
+  const published = db.articles.filter(a=>a.status==='publicado').length;
+  const drafts = db.articles.filter(a=>a.status==='rascunho'||a.status==='revisao').length;
+  const views = db.articles.reduce((s,a)=>s+(a.views||0),0);
+  const users = db.users.length;
+  const cards = [{n:published,t:'Publicados'},{n:drafts,t:'Pendentes'},{n:views,t:'Acessos'},{n:users,t:'Usuários'}];
+  $('dashboardStats').innerHTML = cards.map(c=>`<div class="stat-card"><strong>${c.n}</strong><span>${c.t}</span></div>`).join('');
+  $('recentArticles').innerHTML = visibleContents().slice(0,4).map(articleCard).join('') || '<p class="muted">Nenhum conteúdo encontrado.</p>';
+}
+function renderCards(){
+  const html = db.systems.map(s=>{
+    const mods=db.modules.filter(m=>m.system===s.id); const count=db.articles.filter(a=>a.system===s.id).length;
+    return `<div class="card"><h3>${s.name}</h3><p>${s.description||'Sistema cadastrado no DynamicDoc.'}</p><div class="badge-row"><span class="badge">${count} conteúdos</span>${mods.map(m=>`<span class="badge">${m.name}</span>`).join('')}</div></div>`;
+  }).join('');
+  $('systemCards').innerHTML=html; $('systemsPageCards').innerHTML=html;
+}
+function renderArticles(){ $('articlesList').innerHTML = filteredArticles('article').map(articleCard).join('') || '<p class="muted">Nenhum artigo encontrado.</p>'; }
+function renderProcesses(){ $('processList').innerHTML = visibleContents().filter(a=>(a.kind||'article')==='process').map(articleCard).join('') || '<p class="muted">Nenhum processo interno encontrado.</p>'; }
+function articleCard(a){
+  const sys=db.systems.find(s=>s.id===a.system)?.name||a.system; const mod=db.modules.find(m=>m.id===a.module)?.name||'Sem módulo';
+  return `<article class="article-card"><div><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span><span class="badge">${sys}</span><span class="badge">${mod}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h3>${a.title}</h3><p>${a.summary||''}</p><div class="badge-row">${(a.tags||[]).map(t=>`<span class="badge">#${t}</span>`).join('')}</div></div><div class="article-actions"><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button><button class="small-btn" onclick="toggleFavorite('${a.id}')">${db.favorites.includes(a.id)?'★':'☆'}</button>${canManageContent()?`<button class="small-btn" onclick="editArticle('${a.id}')">Editar</button>`:''}${isAdmin()?`<button class="small-btn small-danger" onclick="deleteArticle('${a.id}')">Excluir</button>`:''}</div></article>`;
+}
+
+function openArticle(id){
+  const a=db.articles.find(x=>x.id===id); if(!a) return;
+  a.views=(a.views||0)+1; db.history=[id,...db.history.filter(x=>x!==id)].slice(0,12); saveDb(); upsert('articles',a);
+  $('articleModalBody').innerHTML = `<div class="modal-body"><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h1>${a.title}</h1><p class="muted">${a.summary||''}</p>${a.image?`<img class="content-media" src="${a.image}" alt="Imagem do artigo">`:''}${a.video?`<video class="content-media" src="${a.video}" controls></video>`:''}<div class="content-text">${(a.content||'').split('\n').map(p=>`<p>${p}</p>`).join('')}</div>${a.file?`<p><a class="primary-btn" href="${a.file}" target="_blank">Abrir arquivo</a></p>`:''}${isStaff()&&a.internalNote?`<div class="comment-box"><strong>Observação interna</strong><p>${a.internalNote}</p></div>`:''}<div class="comment-box"><strong>Comentários internos</strong><div>${(a.comments||[]).map(c=>`<p><b>${c.author}</b> • ${c.date}<br>${c.text}</p>`).join('')||'<p class="muted">Nenhum comentário.</p>'}</div>${isStaff()?`<textarea id="newComment" rows="2" placeholder="Adicionar comentário interno"></textarea><button class="primary-btn" onclick="addComment('${a.id}')">Comentar</button>`:''}</div><div class="article-actions"><button class="small-btn" onclick="rateArticle('${a.id}','likes')">👍 ${a.likes||0}</button><button class="small-btn" onclick="rateArticle('${a.id}','dislikes')">👎 ${a.dislikes||0}</button></div></div>`;
+  $('articleModal').classList.remove('hidden');
+}
+function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:currentUser?.name||'Colaborador',date:nowBR(),text}); saveDb(); upsert('articles',a); openArticle(id);}
+function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsert('articles',a); openArticle(id);}
+function toggleFavorite(id){db.favorites=db.favorites.includes(id)?db.favorites.filter(x=>x!==id):[id,...db.favorites]; saveDb(); renderAll();}
+
+function newContent(kind='article'){ if(!canManageContent()) return alert('Apenas gestores de conteúdo e administradores podem criar.'); selectedArticleId=null; editorReturnPage=kind==='process'?'processes':'articles'; clearEditor(kind); navigate('articleEditor'); }
+function clearEditor(kind){ $('articleId').value=''; $('formKind').value=kind; $('articleEditorTitle').textContent=kind==='process'?'Novo processo interno':'Novo artigo'; ['articleTitle','articleSummary','articleContent','articleTags','articleImage','articleVideo','articleFile','articleInternalNote'].forEach(id=>$(id).value=''); $('articleStatus').value='rascunho'; $('articleVisibility').value=kind==='process'?'interno':'publico'; populateSelects(); }
+function editArticle(id){ const a=db.articles.find(x=>x.id===id); if(!a) return; selectedArticleId=id; editorReturnPage=(a.kind==='process')?'processes':'articles'; navigate('articleEditor'); $('articleId').value=a.id; $('formKind').value=a.kind||'article'; $('articleEditorTitle').textContent='Editar conteúdo'; $('articleTitle').value=a.title||''; $('articleStatus').value=a.status||'rascunho'; $('articleSystem').value=a.system||db.systems[0]?.id; updateModuleOptions(); $('articleModule').value=a.module||''; $('articleDepartment').value=a.department||db.departments[0]?.id; $('articleVisibility').value=a.visibility||'publico'; $('articleSummary').value=a.summary||''; $('articleContent').value=a.content||''; $('articleTags').value=(a.tags||[]).join(', '); $('articleImage').value=a.image||''; $('articleVideo').value=a.video||''; $('articleFile').value=a.file||''; $('articleInternalNote').value=a.internalNote||''; }
+function saveArticle(){
+  if(!canManageContent()) return alert('Sem permissão.');
+  const id=$('articleId').value||uid(); const old=db.articles.find(a=>a.id===id); const base=old||{id,views:0,likes:0,dislikes:0,comments:[],versions:[],createdAt:nowBR()};
+  if(old){ base.versions=base.versions||[]; base.versions.push({version:base.version||'1.0',date:nowBR(),title:base.title,content:base.content,author:currentUser?.name||'Sistema'}); }
+  const nextVersion = old ? (parseFloat(old.version||'1.0')+0.1).toFixed(1) : '1.0';
+  const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').value.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image:$('articleImage').value.trim(), video:$('articleVideo').value.trim(), file:$('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
+  if(!article.title) return alert('Informe o título.');
+  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); upsert('articles',article); navigate(editorReturnPage);
+}
+function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsert('articles',copy); navigate(editorReturnPage); }
+function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote('articles',id); renderAll(); }
+
+function renderFavorites(){
+  const favs=db.favorites.map(id=>db.articles.find(a=>a.id===id)).filter(Boolean); const hist=db.history.map(id=>db.articles.find(a=>a.id===id)).filter(Boolean);
+  $('favoritesList').innerHTML=favs.map(a=>`<p><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button> ${a.title}</p>`).join('')||'<p class="muted">Nenhum favorito.</p>';
+  $('historyList').innerHTML=hist.map(a=>`<p><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button> ${a.title}</p>`).join('')||'<p class="muted">Nenhum histórico.</p>';
+}
+function renderAcademy(){
+  $('academyGrid').innerHTML=db.tracks.map(t=>`<div class="track-card"><h3>${t.title}</h3><p class="muted">${t.description}</p><div class="progress"><div style="width:${t.progress||0}%"></div></div><strong>${t.progress||0}% concluído</strong>${(t.lessons||[]).map((l,i)=>`<div class="lesson"><input type="checkbox" ${i < Math.round((t.progress||0)/100*t.lessons.length)?'checked':''} onchange="updateTrack('${t.id}')"> ${l}</div>`).join('')}</div>`).join('');
+}
+function updateTrack(id){const t=db.tracks.find(x=>x.id===id); t.progress=Math.min(100,(t.progress||0)+25); saveDb(); renderAcademy();}
+function addTrack(){const title=prompt('Nome da trilha:'); if(!title) return; db.tracks.unshift({id:uid(),title,description:'Nova trilha de aprendizagem.',lessons:['Aula 1','Aula 2','Avaliação'],progress:0}); saveDb(); renderAcademy();}
+
+function renderAdmin(){
+  const top=db.articles.slice().sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,5);
+  $('adminStats').innerHTML=[{n:db.articles.length,t:'Conteúdos'},{n:db.users.length,t:'Usuários'},{n:db.searchLogs.length,t:'Buscas'},{n:db.modules.length,t:'Módulos'}].map(c=>`<div class="stat-card"><strong>${c.n}</strong><span>${c.t}</span></div>`).join('');
+  $('usersList').innerHTML=db.users.map(u=>`<div class="user-row"><span><b>${u.name}</b><br><small>${u.email} • ${roleLabel(u.role)}</small></span><button class="small-btn small-danger" onclick="removeUser('${u.id}')">Remover</button></div>`).join('');
+  $('searchMetrics').innerHTML=(db.searchLogs.slice(0,10).map(s=>`<div class="metric-row"><span>${s.query}</span><small>${s.date}</small></div>`).join('')||'<p class="muted">Nenhuma busca registrada.</p>') + `<h4>Mais acessados</h4>${top.map(a=>`<div class="metric-row"><span>${a.title}</span><b>${a.views||0}</b></div>`).join('')}`;
+  $('versionsList').innerHTML=db.articles.map(a=>`<div class="version-item"><span><b>${a.title}</b><br><small>Versão atual: ${a.version||'1.0'} • anteriores: ${(a.versions||[]).length}</small></span><button class="small-btn" onclick="editArticle('${a.id}')">Editar</button></div>`).join('');
+}
+function addUser(){const u={id:uid(),name:$('userName').value.trim(),email:$('userEmail').value.trim(),role:$('userRole').value,department:$('userDepartment').value}; if(!u.name||!u.email) return alert('Preencha nome e e-mail.'); db.users.unshift(u); saveDb(); upsert('profiles',u); ['userName','userEmail'].forEach(id=>$(id).value=''); renderAdmin();}
+function removeUser(id){db.users=db.users.filter(u=>u.id!==id); saveDb(); removeRemote('profiles',id); renderAdmin();}
+function addSystem(){const name=$('newSystemName').value.trim(); if(!name) return; const s={id:normalize(name).replaceAll(' ','-'),name,description:'Sistema cadastrado pela administração.'}; db.systems.push(s); saveDb(); upsert('systems',s); $('newSystemName').value=''; renderAll();}
+function addModule(){const name=$('newModuleName').value.trim(); if(!name) return; const m={id:normalize($('moduleSystem').value+'-'+name).replaceAll(' ','-'),system:$('moduleSystem').value,name}; db.modules.push(m); saveDb(); upsert('modules',m); $('newModuleName').value=''; renderAll();}
+
+function smartSearch(){
+  const q=$('globalSearch').value.trim(); if(!q) return;
+  db.searchLogs.unshift({query:q,date:nowBR()}); db.searchLogs=db.searchLogs.slice(0,50); saveDb();
+  navigate('articles'); $('articleSearch').value=q; renderArticles();
+  const hits=visibleContents().filter(a=>articleMatches(a,q)).slice(0,3);
+  if(hits.length){ const answer=`<div class="ai-answer"><b>Busca inteligente DynamicDoc</b><br>Encontrei ${hits.length} conteúdo(s) relacionado(s). Melhor ponto de partida: <b>${hits[0].title}</b>. Também verifique: ${hits.map(h=>h.title).join(', ')}.</div>`; $('articlesList').insertAdjacentHTML('afterbegin',answer); }
+}
+async function login(){
+  const email=$('loginEmail').value.trim(), pass=$('loginPassword').value;
+  if(supabaseDb && email && pass){ const {error}=await supabaseDb.auth.signInWithPassword({email,password:pass}); if(error) return alert('Erro no login: '+error.message); currentUser={name:email,email,role:'admin',department:'suporte'}; }
+  else currentUser={id:uid(),name:email?.split('@')[0]||'Colaborador Dynamic',email:email||'demo@dynamictravel.com',role:'colaborador',department:'suporte'};
+  saveUser(); $('loginPanel').classList.add('hidden'); renderAll();
+}
+function testLogin(role){currentUser={id:uid(),name:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo':'Colaborador Dynamic',email:`${role}@dynamictravel.com`,role,department:'suporte'}; saveUser(); $('loginPanel').classList.add('hidden'); renderAll();}
+function logout(){currentUser=null; saveUser(); renderAll(); navigate('home');}
+
+function bindEvents(){
+  document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
+  $('loginBtn').onclick=()=>$('loginPanel').classList.remove('hidden'); $('closeLogin').onclick=()=>$('loginPanel').classList.add('hidden'); $('logoutBtn').onclick=logout; $('confirmLogin').onclick=login;
+  document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
+  $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
+  ['articleSearch','filterSystem','filterModule','filterStatus'].forEach(id=>$(id)?.addEventListener('input',renderArticles));
+  $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
+  $('articleSystem').addEventListener('change',updateModuleOptions); $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
+  $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
+}
+
+window.openArticle=openArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.removeUser=removeUser;
+(async function init(){ await syncFromSupabase(); bindEvents(); renderAll(); })();
