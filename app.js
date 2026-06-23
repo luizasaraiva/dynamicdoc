@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const nowBR = () => new Date().toLocaleString('pt-BR');
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
+const escapeHtml = (value='') => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+const escapeAttr = (value='') => escapeHtml(value).replace(/`/g, '&#096;');
 
 const initialData = {
   systems:[
@@ -30,9 +32,24 @@ const initialData = {
   ],
   favorites:[], history:[], searchLogs:[],
   tracks:[
-    {id:uid(),title:'Trilha Argo Básico',description:'Fundamentos do Argo para novos colaboradores.',lessons:['Visão geral do Argo','Cadastros','Aprovações','Reservas e emissões'],progress:50},
-    {id:uid(),title:'Onboarding Dynamic',description:'Conteúdos iniciais para chegada de novos colaboradores.',lessons:['Quem somos','Sistemas internos','Canais de atendimento','Boas práticas'],progress:25},
-    {id:uid(),title:'Expense e Relatórios',description:'Prestação de contas, despesas e consultas gerenciais.',lessons:['Expense básico','Despesas','Relatórios','Erros comuns'],progress:0}
+    {id:uid(),title:'Trilha Argo Básico',description:'Fundamentos do Argo para novos colaboradores.',category:'Sistemas',lessons:[
+      {id:uid(),title:'Visão geral do Argo',duration:'08 min',type:'Vídeo'},
+      {id:uid(),title:'Cadastros',duration:'15 min',type:'Artigo'},
+      {id:uid(),title:'Aprovações',duration:'12 min',type:'Vídeo'},
+      {id:uid(),title:'Reservas e emissões',duration:'18 min',type:'Aula'}
+    ],completedLessons:[],certificates:[]},
+    {id:uid(),title:'Onboarding Dynamic',description:'Conteúdos iniciais para chegada de novos colaboradores.',category:'Onboarding',lessons:[
+      {id:uid(),title:'Quem somos',duration:'05 min',type:'Aula'},
+      {id:uid(),title:'Sistemas internos',duration:'10 min',type:'Vídeo'},
+      {id:uid(),title:'Canais de atendimento',duration:'07 min',type:'Artigo'},
+      {id:uid(),title:'Boas práticas',duration:'12 min',type:'Aula'}
+    ],completedLessons:[],certificates:[]},
+    {id:uid(),title:'Expense e Relatórios',description:'Prestação de contas, despesas e consultas gerenciais.',category:'Sistemas',lessons:[
+      {id:uid(),title:'Expense básico',duration:'09 min',type:'Vídeo'},
+      {id:uid(),title:'Despesas',duration:'13 min',type:'Aula'},
+      {id:uid(),title:'Relatórios',duration:'16 min',type:'Artigo'},
+      {id:uid(),title:'Erros comuns',duration:'10 min',type:'Aula'}
+    ],completedLessons:[],certificates:[]}
   ]
 };
 
@@ -291,13 +308,62 @@ function renderFavorites(){
   $('favoritesList').innerHTML=favs.map(a=>`<p><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button> ${a.title}</p>`).join('')||'<p class="muted">Nenhum favorito.</p>';
   $('historyList').innerHTML=hist.map(a=>`<p><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button> ${a.title}</p>`).join('')||'<p class="muted">Nenhum histórico.</p>';
 }
+
+function currentAcademyUserKey(){
+  return (currentUser?.email || currentUser?.name || 'visitante').toLowerCase();
+}
+function normalizeAcademyTracks(){
+  db.tracks = (db.tracks || []).map(track => {
+    const lessons = (track.lessons || []).map((lesson, index) => {
+      if(typeof lesson === 'string'){
+        return {id:`${track.id}-lesson-${index+1}`, title:lesson, duration:'10 min', type:'Aula'};
+      }
+      return {
+        id: lesson.id || `${track.id}-lesson-${index+1}`,
+        title: lesson.title || lesson.nome || `Aula ${index+1}`,
+        description: lesson.description || lesson.descricao || '',
+        duration: lesson.duration || lesson.duracao || '10 min',
+        type: lesson.type || lesson.tipo || 'Aula',
+        video_url: lesson.video_url || lesson.video || ''
+      };
+    });
+    const completedLessons = Array.isArray(track.completedLessons) ? track.completedLessons : [];
+    const certificates = Array.isArray(track.certificates) ? track.certificates : [];
+    return {...track, lessons, completedLessons, certificates};
+  });
+}
+function getTrackProgress(track){
+  const total = (track.lessons || []).length;
+  if(!total) return 0;
+  const completed = (track.completedLessons || []).length;
+  return Math.round((completed / total) * 100);
+}
+function userHasCertificate(track){
+  const userKey = currentAcademyUserKey();
+  return (track.certificates || []).some(c => c.user === userKey);
+}
+function ensureCertificate(track){
+  const progress = getTrackProgress(track);
+  if(progress < 100 || userHasCertificate(track)) return;
+  track.certificates = track.certificates || [];
+  track.certificates.push({
+    id: uid(),
+    user: currentAcademyUserKey(),
+    name: currentUser?.name || 'Visitante',
+    email: currentUser?.email || '',
+    issuedAt: nowBR()
+  });
+}
 function renderAcademy(){
+  normalizeAcademyTracks();
   const tracks = db.tracks || [];
+  tracks.forEach(ensureCertificate);
   const totalTracks = tracks.length;
   const totalLessons = tracks.reduce((sum,t)=>sum + ((t.lessons||[]).length),0);
-  const avgProgress = totalTracks ? Math.round(tracks.reduce((sum,t)=>sum + Number(t.progress||0),0) / totalTracks) : 0;
-  const completedTracks = tracks.filter(t => Number(t.progress||0) >= 100);
-  const certificates = completedTracks.map(t => t.title);
+  const totalCompletedLessons = tracks.reduce((sum,t)=>sum + ((t.completedLessons||[]).length),0);
+  const avgProgress = totalLessons ? Math.round((totalCompletedLessons / totalLessons) * 100) : 0;
+  const completedTracks = tracks.filter(t => getTrackProgress(t) >= 100);
+  const certificates = tracks.flatMap(t => (t.certificates || []).filter(c=>c.user===currentAcademyUserKey()).map(c=>({track:t.title, ...c})));
 
   if($('academyOverallProgress')) $('academyOverallProgress').textContent = `${avgProgress}%`;
   if($('academyOverallBar')) $('academyOverallBar').style.width = `${avgProgress}%`;
@@ -306,8 +372,8 @@ function renderAcademy(){
     $('academyStats').innerHTML = [
       {icon:'📚', n: totalTracks, t:'Trilhas'},
       {icon:'🎥', n: totalLessons, t:'Aulas'},
-      {icon:'🏆', n: certificates.length, t:'Certificados'},
-      {icon:'⚡', n: `${avgProgress}%`, t:'Progresso'}
+      {icon:'✅', n: totalCompletedLessons, t:'Aulas concluídas'},
+      {icon:'🏆', n: certificates.length, t:'Certificados'}
     ].map(s=>`<div class="academy-stat-card"><span>${s.icon}</span><strong>${s.n}</strong><small>${s.t}</small></div>`).join('');
   }
 
@@ -316,51 +382,69 @@ function renderAcademy(){
   }
   if($('academyCertificates')){
     $('academyCertificates').innerHTML = certificates.length
-      ? certificates.map(c=>`<div class="certificate-line">✓ ${c}</div>`).join('')
+      ? certificates.map(c=>`<div class="certificate-line"><b>✓ ${escapeHtml(c.track)}</b><small>Emitido em ${escapeHtml(c.issuedAt)}</small><button class="small-btn" onclick="downloadCertificate('${escapeAttr(c.track)}','${escapeAttr(c.issuedAt)}')">Baixar</button></div>`).join('')
       : '<div class="certificate-line muted">Em andamento</div>';
   }
 
-  const firstInProgress = tracks.find(t => Number(t.progress||0) < 100) || tracks[0];
+  const firstInProgress = tracks.find(t => getTrackProgress(t) < 100) || tracks[0];
   if($('academyFeaturedLesson')){
-    const lesson = firstInProgress?.lessons?.[0] || 'Selecione uma trilha para continuar.';
-    $('academyFeaturedLesson').textContent = firstInProgress ? `${firstInProgress.title} • ${lesson}` : lesson;
+    const nextLesson = firstInProgress?.lessons?.find(l => !(firstInProgress.completedLessons||[]).includes(l.id)) || firstInProgress?.lessons?.[0];
+    $('academyFeaturedLesson').textContent = firstInProgress && nextLesson ? `${firstInProgress.title} • ${nextLesson.title}` : 'Selecione uma trilha para continuar.';
   }
 
+  if(!$('academyGrid')) return;
   $('academyGrid').innerHTML = tracks.map(t=>{
     const lessons = t.lessons || [];
-    const progress = Number(t.progress || 0);
-    const completedLessons = Math.round((progress/100) * lessons.length);
+    const completed = t.completedLessons || [];
+    const progress = getTrackProgress(t);
     const status = progress >= 100 ? 'Concluído' : progress > 0 ? 'Em andamento' : 'Não iniciado';
-    const buttonText = progress >= 100 ? 'Revisar' : progress > 0 ? 'Continuar' : 'Começar';
+    const buttonText = progress >= 100 ? 'Revisar trilha' : progress > 0 ? 'Continuar trilha' : 'Começar trilha';
+    const certificateAvailable = progress >= 100;
 
     return `
-      <article class="academy-track-card">
+      <article class="academy-track-card ${certificateAvailable ? 'track-completed' : ''}">
         <div class="track-cover">
           <span class="track-icon">${trackIcon(t.title)}</span>
           <span class="track-status">${status}</span>
         </div>
         <div class="track-body">
-          <h3>${t.title}</h3>
-          <p>${t.description || 'Trilha de aprendizagem Dynamic.'}</p>
+          <div class="track-title-row">
+            <h3>${escapeHtml(t.title)}</h3>
+            <span>${escapeHtml(t.category || 'Trilha')}</span>
+          </div>
+          <p>${escapeHtml(t.description || 'Trilha de aprendizagem Dynamic.')}</p>
           <div class="track-meta">
             <span>🎥 ${lessons.length} aulas</span>
-            <span>${progress}% concluído</span>
+            <span>${completed.length}/${lessons.length} concluídas</span>
           </div>
           <div class="progress academy-track-progress"><div style="width:${progress}%"></div></div>
+          <div class="academy-progress-label">${progress}% concluído</div>
+
           <div class="lesson-list">
-            ${lessons.map((l,i)=>`
-              <label class="academy-lesson ${i < completedLessons ? 'done' : ''}">
-                <input type="checkbox" ${i < completedLessons ? 'checked' : ''} onchange="updateTrack('${t.id}')">
-                <span>${i < completedLessons ? '✓' : i+1}</span>
-                <b>${l}</b>
-              </label>
-            `).join('')}
+            ${lessons.map((l,i)=>{
+              const done = completed.includes(l.id);
+              return `
+                <label class="academy-lesson ${done ? 'done' : ''}">
+                  <input type="checkbox" ${done ? 'checked' : ''} onchange="toggleLesson('${t.id}','${l.id}',this.checked)">
+                  <span>${done ? '✓' : i+1}</span>
+                  <b>${escapeHtml(l.title)}</b>
+                  <small>${escapeHtml(l.type || 'Aula')} • ${escapeHtml(l.duration || '10 min')}</small>
+                </label>
+              `;
+            }).join('')}
           </div>
-          <button class="primary-btn full track-action" onclick="updateTrack('${t.id}')">${buttonText}</button>
+
+          <div class="track-actions-row">
+            <button class="primary-btn full track-action" onclick="openTrack('${t.id}')">${buttonText}</button>
+            <button class="ghost-btn admin-only" onclick="addLesson('${t.id}')">+ Aula</button>
+          </div>
+          ${certificateAvailable ? `<button class="certificate-download-btn" onclick="downloadCertificate('${escapeAttr(t.title)}','${escapeAttr((t.certificates||[]).find(c=>c.user===currentAcademyUserKey())?.issuedAt || nowBR())}')">🏆 Baixar certificado</button>` : ''}
         </div>
       </article>
     `;
   }).join('') || '<div class="empty-state">Nenhuma trilha cadastrada ainda.</div>';
+
+  saveDb();
 }
 
 function trackIcon(title=''){
@@ -373,8 +457,73 @@ function trackIcon(title=''){
   if(t.includes('reserva')) return '🧳';
   return '🎓';
 }
-function updateTrack(id){const t=db.tracks.find(x=>x.id===id); t.progress=Math.min(100,(t.progress||0)+25); saveDb(); renderAcademy();}
-function addTrack(){const title=prompt('Nome da trilha:'); if(!title) return; db.tracks.unshift({id:uid(),title,description:'Nova trilha de aprendizagem.',lessons:['Aula 1','Aula 2','Avaliação'],progress:0}); saveDb(); renderAcademy();}
+
+function toggleLesson(trackId, lessonId, checked){
+  normalizeAcademyTracks();
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  track.completedLessons = track.completedLessons || [];
+  if(checked && !track.completedLessons.includes(lessonId)) track.completedLessons.push(lessonId);
+  if(!checked) track.completedLessons = track.completedLessons.filter(id=>id!==lessonId);
+  ensureCertificate(track);
+  saveDb();
+  renderAcademy();
+}
+function openTrack(trackId){
+  normalizeAcademyTracks();
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  const next = (track.lessons || []).find(l=>!(track.completedLessons||[]).includes(l.id)) || (track.lessons||[])[0];
+  if(next) toggleLesson(trackId, next.id, true);
+}
+function updateTrack(id){openTrack(id);}
+function addLesson(trackId){
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  const title = prompt('Nome da aula:');
+  if(!title) return;
+  const duration = prompt('Duração da aula:', '10 min') || '10 min';
+  const type = prompt('Tipo de aula:', 'Aula') || 'Aula';
+  track.lessons = track.lessons || [];
+  track.lessons.push({id:uid(), title, duration, type});
+  saveDb();
+  renderAcademy();
+}
+function addTrack(){
+  const title=prompt('Nome da trilha:');
+  if(!title) return;
+  const description=prompt('Descrição da trilha:', 'Nova trilha de aprendizagem.') || 'Nova trilha de aprendizagem.';
+  db.tracks.unshift({id:uid(),title,description,category:'Nova trilha',lessons:[
+    {id:uid(),title:'Introdução',duration:'08 min',type:'Aula'},
+    {id:uid(),title:'Conteúdo principal',duration:'15 min',type:'Vídeo'},
+    {id:uid(),title:'Revisão final',duration:'10 min',type:'Avaliação'}
+  ],completedLessons:[],certificates:[]});
+  saveDb();
+  renderAcademy();
+}
+function downloadCertificate(trackTitle, issuedAt){
+  const name = currentUser?.name || 'Participante Dynamic';
+  const html = `
+    <html><head><title>Certificado Dynamic</title>
+    <style>
+      body{font-family:Arial,sans-serif;background:#f4f7ff;padding:40px;color:#08245c}
+      .cert{background:white;border:10px solid #053798;border-radius:24px;padding:60px;text-align:center;max-width:900px;margin:auto}
+      h1{font-size:44px;margin:0;color:#053798}.seal{font-size:64px}.name{font-size:32px;font-weight:bold;margin:24px 0}
+      p{font-size:18px;line-height:1.6}.track{font-size:28px;font-weight:bold;color:#0a5cff}
+      .footer{margin-top:50px;font-size:14px;color:#68758d}
+    </style></head><body><div class="cert">
+      <div class="seal">🏆</div><h1>Certificado de Conclusão</h1>
+      <p>Certificamos que</p><div class="name">${escapeHtml(name)}</div>
+      <p>concluiu com sucesso a trilha</p><div class="track">${escapeHtml(trackTitle)}</div>
+      <p>pela Academia Dynamic.</p>
+      <div class="footer">Emitido em ${escapeHtml(issuedAt)} • DynamicDoc</div>
+    </div></body></html>`;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
 
 function renderAdmin(){
   const top=db.articles.slice().sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,5);
@@ -429,5 +578,5 @@ function bindEvents(){
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
 }
 
-window.openArticle=openArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.removeUser=removeUser;
+window.openArticle=openArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
 (async function init(){ await syncFromSupabase(); bindEvents(); renderAll(); })();
