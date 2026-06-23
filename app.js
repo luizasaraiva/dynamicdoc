@@ -157,11 +157,11 @@ function navigate(page){
 function renderAll(){applyAccess(); populateSelects(); renderDashboard(); renderCards(); renderArticles(); renderProcesses(); renderFavorites(); renderAcademy(); renderAdmin();}
 function populateSelects(){
   const sysOpts = ['<option value="">Todos os sistemas</option>', ...db.systems.map(s=>`<option value="${s.id}">${s.name}</option>`)].join('');
-  ['filterSystem'].forEach(id=>$(id) && ($(id).innerHTML=sysOpts));
+  ['filterSystem','processSystem'].forEach(id=>$(id) && ($(id).innerHTML=sysOpts));
   const sysOnly = db.systems.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   ['articleSystem','moduleSystem'].forEach(id=>$(id) && ($(id).innerHTML=sysOnly));
   const modOpts = ['<option value="">Todos os módulos</option>', ...db.modules.map(m=>`<option value="${m.id}">${m.name}</option>`)].join('');
-  ['filterModule'].forEach(id=>$(id) && ($(id).innerHTML=modOpts));
+  ['filterModule','processModule'].forEach(id=>$(id) && ($(id).innerHTML=modOpts));
   const depOpts = db.departments.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
   ['articleDepartment','userDepartment'].forEach(id=>$(id) && ($(id).innerHTML=depOpts));
   updateModuleOptions();
@@ -199,7 +199,32 @@ function renderCards(){
   $('systemCards').innerHTML=html; $('systemsPageCards').innerHTML=html;
 }
 function renderArticles(){ $('articlesList').innerHTML = filteredArticles('article').map(articleCard).join('') || '<p class="muted">Nenhum artigo encontrado.</p>'; }
-function renderProcesses(){ $('processList').innerHTML = visibleContents().filter(a=>(a.kind||'article')==='process').map(articleCard).join('') || '<p class="muted">Nenhum processo interno encontrado.</p>'; }
+
+function processContents(){
+  const term = (($('processSearch') && $('processSearch').value) || '').toLowerCase().trim();
+  const system = ($('processSystem') && $('processSystem').value) || '';
+  const module = ($('processModule') && $('processModule').value) || '';
+  const status = ($('processStatus') && $('processStatus').value) || 'publicado';
+
+  return visibleContents()
+    .filter(a => (a.kind || 'article') === 'process' || a.visibility === 'interno')
+    .filter(a => !system || a.system === system)
+    .filter(a => !module || a.module === module)
+    .filter(a => !status || a.status === status)
+    .filter(a => {
+      if (!term) return true;
+      const sysName = db.systems.find(s => s.id === a.system)?.name || '';
+      const modName = db.modules.find(m => m.id === a.module)?.name || '';
+      const haystack = [a.title, a.summary, a.content, a.department, sysName, modName, ...(a.tags || [])].join(' ').toLowerCase();
+      return haystack.includes(term);
+    });
+}
+
+function renderProcesses(){
+  const list = processContents();
+  $('processList').innerHTML = list.map(articleCard).join('') || '<p class="muted">Nenhum processo interno encontrado.</p>';
+}
+
 function articleCard(a){
   const sys=db.systems.find(s=>s.id===a.system)?.name||a.system; const mod=db.modules.find(m=>m.id===a.module)?.name||'Sem módulo';
   return `<article class="article-card"><div><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span><span class="badge">${sys}</span><span class="badge">${mod}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h3>${a.title}</h3><p>${a.summary||''}</p><div class="badge-row">${(a.tags||[]).map(t=>`<span class="badge">#${t}</span>`).join('')}</div></div><div class="article-actions"><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button><button class="small-btn" onclick="toggleFavorite('${a.id}')">${db.favorites.includes(a.id)?'★':'☆'}</button>${canManageContent()?`<button class="small-btn" onclick="editArticle('${a.id}')">Editar</button>`:''}${isAdmin()?`<button class="small-btn small-danger" onclick="deleteArticle('${a.id}')">Excluir</button>`:''}</div></article>`;
@@ -275,6 +300,7 @@ function bindEvents(){
   document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
   $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
   ['articleSearch','filterSystem','filterModule','filterStatus'].forEach(id=>$(id)?.addEventListener('input',renderArticles));
+  ['processSearch','processSystem','processModule','processStatus'].forEach(id=>$(id)?.addEventListener('input',renderProcesses));
   $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
   $('articleSystem').addEventListener('change',updateModuleOptions); $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
