@@ -302,7 +302,16 @@ function renderAdmin(){
   $('adminStats').innerHTML=[{n:db.articles.length,t:'Conteúdos'},{n:db.users.length,t:'Usuários'},{n:db.searchLogs.length,t:'Buscas'},{n:db.modules.length,t:'Módulos'}].map(c=>`<div class="stat-card"><strong>${c.n}</strong><span>${c.t}</span></div>`).join('');
   $('usersList').innerHTML=db.users.map(u=>`<div class="user-row"><span><b>${u.name}</b><br><small>${u.email} • ${roleLabel(u.role)}</small></span><button class="small-btn small-danger" onclick="removeUser('${u.id}')">Remover</button></div>`).join('');
   $('searchMetrics').innerHTML=(db.searchLogs.slice(0,10).map(s=>`<div class="metric-row"><span>${s.query}</span><small>${s.date}</small></div>`).join('')||'<p class="muted">Nenhuma busca registrada.</p>') + `<h4>Mais acessados</h4>${top.map(a=>`<div class="metric-row"><span>${a.title}</span><b>${a.views||0}</b></div>`).join('')}`;
-  $('versionsList').innerHTML=db.articles.map(a=>`<div class="version-item"><span><b>${a.title}</b><br><small>Versão atual: ${a.version||'1.0'} • anteriores: ${(a.versions||[]).length}</small></span><button class="small-btn" onclick="editArticle('${a.id}')">Editar</button></div>`).join('');
+  const versionQuery = normalize($('versionSearch')?.value || '');
+  const versionResults = db.articles.filter(a => {
+    if (!versionQuery) return true;
+    const versionText = normalize([
+      a.title,
+      ...(a.versions || []).map(v => v.author)
+    ].filter(Boolean).join(' '));
+    return versionText.includes(versionQuery);
+  });
+  $('versionsList').innerHTML = versionResults.map(a=>`<div class="version-item"><span><b>${a.title}</b><br><small>Versão atual: ${a.version||'1.0'} • anteriores: ${(a.versions||[]).length}</small></span><button class="small-btn" onclick="editArticle('${a.id}')">Editar</button></div>`).join('') || '<p class="muted">Nenhuma versão encontrada.</p>';
 }
 function addUser(){const u={id:uid(),name:$('userName').value.trim(),email:$('userEmail').value.trim(),role:$('userRole').value,department:$('userDepartment').value}; if(!u.name||!u.email) return alert('Preencha nome e e-mail.'); db.users.unshift(u); saveDb(); upsert(PROFILE_TABLE, u); ['userName','userEmail'].forEach(id=>$(id).value=''); renderAdmin();}
 function removeUser(id){db.users=db.users.filter(u=>u.id!==id); saveDb(); removeRemote(PROFILE_TABLE, id); renderAdmin();}
@@ -335,6 +344,7 @@ function bindEvents(){
     $(id)?.addEventListener('input',renderProcesses);
     $(id)?.addEventListener('change',renderProcesses);
   });
+  $('versionSearch')?.addEventListener('input', renderAdmin);
   $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
   $('articleSystem').addEventListener('change',updateModuleOptions); $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
