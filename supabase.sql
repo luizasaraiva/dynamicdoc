@@ -1,4 +1,3 @@
-
 -- DynamicDoc Produto Interno - estrutura completa
 create table if not exists systems (id text primary key, name text not null, description text);
 create table if not exists modules (id text primary key, system text references systems(id) on delete cascade, name text not null);
