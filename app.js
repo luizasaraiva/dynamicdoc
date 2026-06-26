@@ -71,9 +71,11 @@ const supabaseDb = supabaseReady ? window.supabase.createClient(supabaseSettings
 const STORAGE_BUCKET = supabaseSettings.storageBucket || 'dynamicdoc-files';
 
 
+const isAuthenticated = () => !!currentUser;
 const isStaff = () => ['colaborador','gestor','admin'].includes(currentUser?.role);
 const canManageContent = () => ['gestor','admin'].includes(currentUser?.role);
 const isAdmin = () => currentUser?.role === 'admin';
+const canAccessAcademy = () => isAuthenticated();
 const roleLabel = (role) => ({usuario:'Usuário',colaborador:'Colaborador',gestor:'Gestor de Conteúdo',admin:'Administrador'}[role] || 'Visitante');
 const normalize = (v) => (v || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const displayUserName = (user=currentUser) => user?.fullName || user?.nome_completo || user?.name || user?.nome || user?.email?.split('@')[0] || 'Participante Dynamic';
@@ -288,17 +290,22 @@ function applyAccess(){
   document.querySelectorAll('.staff-only').forEach(el=>el.classList.toggle('hidden', !isStaff()));
   document.querySelectorAll('.content-manager-only').forEach(el=>el.classList.toggle('hidden', !canManageContent()));
   document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden', !isAdmin()));
+  document.querySelectorAll('.auth-only').forEach(el=>el.classList.toggle('hidden', !isAuthenticated()));
 }
 
 function navigate(page){
   if(page==='admin' && !isAdmin()) page='home';
   if(page==='processes' && !isStaff()) page='home';
+  if(['academy','courseView','lessonView'].includes(page) && !canAccessAcademy()) {
+    alert('A Academia Dynamic é exclusiva para usuários logados. Clique em Entrar para acessar.');
+    page='home';
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));
   $(page)?.classList.add('active-page');
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
   const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',dynamicbot:'DynamicBot IA',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo',articleView:'Artigo aberto',courseView:'Curso aberto',lessonView:'Aula aberta'};
   $('pageTitle').textContent = titles[page] || 'DynamicDoc';
-  renderAll(); window.scrollTo(0,0);
+  renderAll(); closeMobileSidebar(); window.scrollTo(0,0);
 }
 
 function renderAll(){applyAccess(); populateSelects(); renderDashboard(); renderCards(); renderArticles(); renderProcesses(); renderDynamicBot(); renderFavorites(); renderAcademy(); renderAdmin();}
@@ -360,16 +367,19 @@ function renderDashboard(){
   const adminView = $('adminDashboardView');
   const userView = $('userDashboardView');
   const adminMode = isAdmin();
+  const visitorMode = !isAuthenticated();
   if(adminView) adminView.classList.toggle('hidden', !adminMode);
   if(userView) userView.classList.toggle('hidden', adminMode);
 
-  if($('dashboardHeroTitle')) $('dashboardHeroTitle').textContent = adminMode ? 'Dashboard administrativo do DynamicDoc.' : `Olá, ${displayUserName(currentUser)}. Continue aprendendo.`;
+  if($('dashboardHeroTitle')) $('dashboardHeroTitle').textContent = adminMode ? 'Dashboard administrativo do DynamicDoc.' : visitorMode ? 'Bem-vindo ao portal público do DynamicDoc.' : `Olá, ${displayUserName(currentUser)}. Continue aprendendo.`;
   if($('dashboardHeroSubtitle')) $('dashboardHeroSubtitle').textContent = adminMode
     ? 'Acompanhe publicações, cursos, alunos, certificados, acessos e conteúdos mais vistos.'
-    : 'Veja seus cursos em andamento, progresso, certificados e últimas atualizações da base.';
-  if($('dashboardHeroIcon')) $('dashboardHeroIcon').textContent = adminMode ? '📊' : '🎓';
-  if($('dashboardHeroMetric')) $('dashboardHeroMetric').textContent = adminMode ? dashboardNumber(totalViews) : `${avgProgress}%`;
-  if($('dashboardHeroLabel')) $('dashboardHeroLabel').textContent = adminMode ? 'acessos totais' : 'progresso médio';
+    : visitorMode
+      ? 'Consulte artigos públicos e sistemas disponíveis. A Academia Dynamic é exclusiva para usuários logados.'
+      : 'Veja seus cursos em andamento, progresso, certificados e últimas atualizações da base.';
+  if($('dashboardHeroIcon')) $('dashboardHeroIcon').textContent = adminMode ? '📊' : visitorMode ? '📚' : '🎓';
+  if($('dashboardHeroMetric')) $('dashboardHeroMetric').textContent = adminMode ? dashboardNumber(totalViews) : visitorMode ? dashboardNumber(contents.length) : `${avgProgress}%`;
+  if($('dashboardHeroLabel')) $('dashboardHeroLabel').textContent = adminMode ? 'acessos totais' : visitorMode ? 'conteúdos públicos' : 'progresso médio';
 
   const adminCards = [
     dashboardKpiCard('📚', publishedArticles, 'Artigos publicados', 'Base pública e corporativa'),
@@ -379,7 +389,11 @@ function renderDashboard(){
     dashboardKpiCard('👁️', totalViews, 'Acessos', 'Visualizações em artigos'),
     dashboardKpiCard('🧭', publishedProcesses, 'Processos internos', 'Conteúdos para equipe')
   ];
-  const userCards = [
+  const userCards = visitorMode ? [
+    dashboardKpiCard('📚', publishedArticles, 'Artigos públicos', 'Disponíveis sem login'),
+    dashboardKpiCard('🗂️', db.systems.length, 'Sistemas', 'Categorias publicadas'),
+    dashboardKpiCard('🆕', contents.length, 'Atualizações', 'Conteúdos publicados')
+  ] : [
     dashboardKpiCard('🎓', courses, 'Cursos disponíveis', 'Academia Dynamic'),
     dashboardKpiCard('📈', `${avgProgress}%`, 'Progresso médio', 'Cursos em andamento'),
     dashboardKpiCard('🏆', userCertificates.length, 'Certificados', 'Conquistas disponíveis'),
@@ -401,14 +415,14 @@ function renderDashboard(){
   if($('recentUpdatesAdmin')) $('recentUpdatesAdmin').innerHTML = recentHtml;
   if($('recentUpdatesUser')) $('recentUpdatesUser').innerHTML = recentHtml;
 
-  const courseRows = (db.tracks||[]).map(t=>{
+  const courseRows = visitorMode ? '' : (db.tracks||[]).map(t=>{
     const progress = getTrackProgress(t);
     const next = (t.lessons||[]).find(l=>!(t.completedLessons||[]).includes(l.id)) || (t.lessons||[])[0];
     return `<div class="dashboard-course-row-v2"><div><b>${escapeHtml(t.title)}</b><small>${(t.lessons||[]).length} aulas • ${progress}% concluído</small><div class="progress"><div style="width:${progress}%"></div></div></div><button class="small-btn" onclick="${next ? `openLessonPage('${t.id}','${next.id}')` : `openCourse('${t.id}')`}">${progress>0?'Continuar':'Começar'}</button></div>`;
   }).join('');
-  if($('userCoursesProgress')) $('userCoursesProgress').innerHTML = courseRows || '<p class="muted">Nenhum curso cadastrado ainda.</p>';
+  if($('userCoursesProgress')) $('userCoursesProgress').innerHTML = visitorMode ? '<p class="muted">A Academia Dynamic é exclusiva para usuários logados.</p>' : (courseRows || '<p class="muted">Nenhum curso cadastrado ainda.</p>');
 
-  if($('userCertificatesDashboard')) $('userCertificatesDashboard').innerHTML = userCertificates.length
+  if($('userCertificatesDashboard')) $('userCertificatesDashboard').innerHTML = visitorMode ? '<p class="muted">Certificados ficam disponíveis após login e conclusão dos cursos.</p>' : userCertificates.length
     ? userCertificates.map(c=>{ const t=(db.tracks||[]).find(x=>(x.certificates||[]).some(cert=>cert.id===c.id)); return `<button onclick="downloadCertificate('${escapeAttr(t?.title||'Curso Dynamic')}','${escapeAttr(c.issuedAt)}')"><b>${escapeHtml(t?.title||'Curso Dynamic')}</b><small>${escapeHtml(c.issuedAt||'Emitido')}</small></button>`; }).join('')
     : '<p class="muted">Conclua um curso para liberar seu primeiro certificado.</p>';
 
@@ -808,6 +822,10 @@ function ensureCertificate(track){
   });
 }
 function renderAcademy(){
+  if(!canAccessAcademy()){
+    if($('academyGrid')) $('academyGrid').innerHTML = '<div class="empty-state">A Academia Dynamic é exclusiva para usuários logados.</div>';
+    return;
+  }
   normalizeAcademyTracks();
   const tracks = db.tracks || [];
   tracks.forEach(ensureCertificate);
@@ -947,6 +965,7 @@ function academyLessonButtons(track, activeLessonId=''){
   `).join('') || '<p class="muted">Nenhuma aula cadastrada ainda.</p>';
 }
 function openCourse(trackId){
+  if(!canAccessAcademy()) return navigate('home');
   normalizeAcademyTracks();
   const fromPage = currentPageId();
   if(fromPage !== 'courseView' && fromPage !== 'lessonView') courseReturnPage = fromPage || 'academy';
@@ -1006,6 +1025,7 @@ function openCourse(trackId){
 function backToAcademy(){ navigate(courseReturnPage || 'academy'); }
 function backToCourse(){ if(currentCourseId) openCourse(currentCourseId); else navigate('academy'); }
 function openLessonPage(trackId, lessonId){
+  if(!canAccessAcademy()) return navigate('home');
   normalizeAcademyTracks();
   currentCourseId = trackId;
   currentLessonId = lessonId;
@@ -1473,8 +1493,22 @@ async function login(){
 function testLogin(role){currentUser={id:uid(),name:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo':'Colaborador Dynamic',fullName:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo Dynamic':'Colaborador Dynamic',email:`${role}@dynamictravel.com`,role,department:'suporte'}; saveUser(); $('loginPanel').classList.add('hidden'); renderAll();}
 function logout(){currentUser=null; saveUser(); renderAll(); navigate('home');}
 
+
+function openMobileSidebar(){
+  document.body.classList.add('sidebar-open');
+}
+function closeMobileSidebar(){
+  document.body.classList.remove('sidebar-open');
+}
+function toggleMobileSidebar(){
+  document.body.classList.toggle('sidebar-open');
+}
+
 function bindEvents(){
   document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
+  $('mobileMenuBtn')?.addEventListener('click', toggleMobileSidebar);
+  $('mobileSidebarBackdrop')?.addEventListener('click', closeMobileSidebar);
+  window.addEventListener('resize', ()=>{ if(window.innerWidth>1024) closeMobileSidebar(); });
   $('loginBtn').onclick=()=>$('loginPanel').classList.remove('hidden'); $('closeLogin').onclick=()=>$('loginPanel').classList.add('hidden'); $('logoutBtn').onclick=logout; $('confirmLogin').onclick=login;
   document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
   $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
@@ -1555,6 +1589,10 @@ function academyAdminToolbar(){
 }
 
 function renderAcademy(){
+  if(!canAccessAcademy()){
+    if($('academyGrid')) $('academyGrid').innerHTML = '<div class="empty-state">A Academia Dynamic é exclusiva para usuários logados.</div>';
+    return;
+  }
   normalizeAcademyTracks();
   const tracks = db.tracks || [];
   const stats = academyCourseStats();
@@ -1632,6 +1670,7 @@ function renderAcademy(){
 }
 
 function openCourse(trackId){
+  if(!canAccessAcademy()) return navigate('home');
   normalizeAcademyTracks();
   const fromPage = currentPageId();
   if(fromPage !== 'courseView' && fromPage !== 'lessonView') courseReturnPage = fromPage || 'academy';
@@ -1705,6 +1744,7 @@ function academyLessonButtons(track, activeLessonId=''){
 }
 
 function openLessonPage(trackId, lessonId){
+  if(!canAccessAcademy()) return navigate('home');
   normalizeAcademyTracks(); currentCourseId = trackId; currentLessonId = lessonId;
   const track = db.tracks.find(t=>t.id===trackId); if(!track) return;
   const lessons = track.lessons || []; const lesson = lessons.find(l=>l.id===lessonId) || lessons[0];
