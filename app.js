@@ -329,21 +329,103 @@ function filteredArticles(kind='article'){
   return visibleContents().filter(a => (a.kind||'article')===kind && articleMatches(a,q) && (!sys||a.system===sys) && (!mod||a.module===mod) && (!st||a.status===st));
 }
 
+function dashboardNumber(value){
+  const n = Number(value || 0);
+  return n > 999 ? n.toLocaleString('pt-BR') : String(n);
+}
+function dashboardDate(value){
+  if(!value) return 'Sem data';
+  return String(value).replace(',', ' • ');
+}
+function dashboardKpiCard(icon, number, label, hint){
+  return `<div class="dashboard-kpi-card-v2"><span>${icon}</span><strong>${dashboardNumber(number)}</strong><small>${escapeHtml(label)}</small><p>${escapeHtml(hint || '')}</p></div>`;
+}
+function articleUpdateRow(a){
+  const sys = db.systems.find(s=>s.id===a.system)?.name || a.system || 'Geral';
+  return `<button class="dashboard-update-row-v2" onclick="openArticle('${a.id}')"><span>${escapeHtml(sys)}</span><b>${escapeHtml(a.title)}</b><small>${escapeHtml(dashboardDate(a.updatedAt || a.createdAt))}</small></button>`;
+}
 function renderDashboard(){
-  const published = db.articles.filter(a=>a.status==='publicado').length;
-  const drafts = db.articles.filter(a=>a.status==='rascunho'||a.status==='revisao').length;
-  const views = db.articles.reduce((s,a)=>s+(a.views||0),0);
-  const users = db.users.length;
-  const cards = [{n:published,t:'Publicados'},{n:drafts,t:'Pendentes'},{n:views,t:'Acessos'},{n:users,t:'Usuários'}];
-  $('dashboardStats').innerHTML = cards.map(c=>`<div class="stat-card"><strong>${c.n}</strong><span>${c.t}</span></div>`).join('');
-  $('recentArticles').innerHTML = visibleContents().slice(0,4).map(articleCard).join('') || '<p class="muted">Nenhum conteúdo encontrado.</p>';
+  normalizeAcademyTracks();
+  const contents = visibleContents();
+  const publishedArticles = db.articles.filter(a=>a.status==='publicado' && (a.kind||'article')==='article').length;
+  const publishedProcesses = db.articles.filter(a=>a.status==='publicado' && (a.kind||'article')==='process').length;
+  const totalViews = db.articles.reduce((s,a)=>s+Number(a.views||0),0);
+  const courses = (db.tracks||[]).length;
+  const lessons = (db.tracks||[]).reduce((s,t)=>s+((t.lessons||[]).length),0);
+  const certificates = (db.tracks||[]).flatMap(t=>(t.certificates||[]));
+  const userCertificates = certificates.filter(c=>c.user===currentAcademyUserKey());
+  const totalUsers = db.users.length;
+  const avgProgress = courses ? Math.round((db.tracks||[]).reduce((s,t)=>s+getTrackProgress(t),0)/courses) : 0;
+
+  const adminView = $('adminDashboardView');
+  const userView = $('userDashboardView');
+  const adminMode = isAdmin();
+  if(adminView) adminView.classList.toggle('hidden', !adminMode);
+  if(userView) userView.classList.toggle('hidden', adminMode);
+
+  if($('dashboardHeroTitle')) $('dashboardHeroTitle').textContent = adminMode ? 'Dashboard administrativo do DynamicDoc.' : `Olá, ${displayUserName(currentUser)}. Continue aprendendo.`;
+  if($('dashboardHeroSubtitle')) $('dashboardHeroSubtitle').textContent = adminMode
+    ? 'Acompanhe publicações, cursos, alunos, certificados, acessos e conteúdos mais vistos.'
+    : 'Veja seus cursos em andamento, progresso, certificados e últimas atualizações da base.';
+  if($('dashboardHeroIcon')) $('dashboardHeroIcon').textContent = adminMode ? '📊' : '🎓';
+  if($('dashboardHeroMetric')) $('dashboardHeroMetric').textContent = adminMode ? dashboardNumber(totalViews) : `${avgProgress}%`;
+  if($('dashboardHeroLabel')) $('dashboardHeroLabel').textContent = adminMode ? 'acessos totais' : 'progresso médio';
+
+  const adminCards = [
+    dashboardKpiCard('📚', publishedArticles, 'Artigos publicados', 'Base pública e corporativa'),
+    dashboardKpiCard('🎓', courses, 'Cursos', `${lessons} aulas cadastradas`),
+    dashboardKpiCard('👥', totalUsers, 'Alunos/usuários', 'Perfis cadastrados'),
+    dashboardKpiCard('🏆', certificates.length, 'Certificados', 'Emitidos na Academia'),
+    dashboardKpiCard('👁️', totalViews, 'Acessos', 'Visualizações em artigos'),
+    dashboardKpiCard('🧭', publishedProcesses, 'Processos internos', 'Conteúdos para equipe')
+  ];
+  const userCards = [
+    dashboardKpiCard('🎓', courses, 'Cursos disponíveis', 'Academia Dynamic'),
+    dashboardKpiCard('📈', `${avgProgress}%`, 'Progresso médio', 'Cursos em andamento'),
+    dashboardKpiCard('🏆', userCertificates.length, 'Certificados', 'Conquistas disponíveis'),
+    dashboardKpiCard('🆕', contents.length, 'Atualizações', 'Conteúdos publicados')
+  ];
+  if($('dashboardStats')) $('dashboardStats').innerHTML = (adminMode ? adminCards : userCards).join('');
+
+  const topArticles = [...db.articles].filter(a=>a.status==='publicado').sort((a,b)=>Number(b.views||0)-Number(a.views||0)).slice(0,5);
+  if($('topViewedArticles')) $('topViewedArticles').innerHTML = topArticles.map((a,i)=>`<button onclick="openArticle('${a.id}')"><span>${i+1}</span><div><b>${escapeHtml(a.title)}</b><small>${Number(a.views||0)} acessos • ${escapeHtml(db.systems.find(s=>s.id===a.system)?.name || 'Geral')}</small></div></button>`).join('') || '<p class="muted">Nenhum acesso registrado ainda.</p>';
+
+  if($('adminAcademySummary')) $('adminAcademySummary').innerHTML = [
+    `<div><b>${courses} cursos ativos</b><small>${lessons} aulas cadastradas</small></div>`,
+    `<div><b>${certificates.length} certificados emitidos</b><small>${avgProgress}% de conclusão média</small></div>`,
+    `<div><b>${totalUsers} usuários</b><small>Perfis disponíveis no portal</small></div>`
+  ].join('');
+
+  const recent = [...contents].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))).slice(0,6);
+  const recentHtml = recent.map(articleUpdateRow).join('') || '<p class="muted">Nenhuma atualização publicada ainda.</p>';
+  if($('recentUpdatesAdmin')) $('recentUpdatesAdmin').innerHTML = recentHtml;
+  if($('recentUpdatesUser')) $('recentUpdatesUser').innerHTML = recentHtml;
+
+  const courseRows = (db.tracks||[]).map(t=>{
+    const progress = getTrackProgress(t);
+    const next = (t.lessons||[]).find(l=>!(t.completedLessons||[]).includes(l.id)) || (t.lessons||[])[0];
+    return `<div class="dashboard-course-row-v2"><div><b>${escapeHtml(t.title)}</b><small>${(t.lessons||[]).length} aulas • ${progress}% concluído</small><div class="progress"><div style="width:${progress}%"></div></div></div><button class="small-btn" onclick="${next ? `openLessonPage('${t.id}','${next.id}')` : `openCourse('${t.id}')`}">${progress>0?'Continuar':'Começar'}</button></div>`;
+  }).join('');
+  if($('userCoursesProgress')) $('userCoursesProgress').innerHTML = courseRows || '<p class="muted">Nenhum curso cadastrado ainda.</p>';
+
+  if($('userCertificatesDashboard')) $('userCertificatesDashboard').innerHTML = userCertificates.length
+    ? userCertificates.map(c=>{ const t=(db.tracks||[]).find(x=>(x.certificates||[]).some(cert=>cert.id===c.id)); return `<button onclick="downloadCertificate('${escapeAttr(t?.title||'Curso Dynamic')}','${escapeAttr(c.issuedAt)}')"><b>${escapeHtml(t?.title||'Curso Dynamic')}</b><small>${escapeHtml(c.issuedAt||'Emitido')}</small></button>`; }).join('')
+    : '<p class="muted">Conclua um curso para liberar seu primeiro certificado.</p>';
+
+  if($('recentArticles')) $('recentArticles').innerHTML = recent.slice(0,4).map(articleCard).join('') || '<p class="muted">Nenhum conteúdo encontrado.</p>';
 }
 function renderCards(){
   const html = db.systems.map(s=>{
     const mods=db.modules.filter(m=>m.system===s.id); const count=db.articles.filter(a=>a.system===s.id).length;
     return `<div class="card"><h3>${s.name}</h3><p>${s.description||'Sistema cadastrado no DynamicDoc.'}</p><div class="badge-row"><span class="badge">${count} conteúdos</span>${mods.map(m=>`<span class="badge">${m.name}</span>`).join('')}</div></div>`;
   }).join('');
-  $('systemCards').innerHTML=html; $('systemsPageCards').innerHTML=html;
+  const compact = db.systems.slice(0,5).map(s=>{
+    const count=db.articles.filter(a=>a.system===s.id && a.status==='publicado').length;
+    return `<button onclick="navigate('systems')"><b>${escapeHtml(s.name)}</b><small>${count} conteúdos</small></button>`;
+  }).join('');
+  if($('systemCards')) $('systemCards').innerHTML=compact || '<p class="muted">Nenhum sistema cadastrado.</p>';
+  if($('legacySystemCards')) $('legacySystemCards').innerHTML=html;
+  if($('systemsPageCards')) $('systemsPageCards').innerHTML=html;
 }
 function renderArticles(){ $('articlesList').innerHTML = filteredArticles('article').map(articleCard).join('') || '<p class="muted">Nenhum artigo encontrado.</p>'; }
 
