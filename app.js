@@ -1288,10 +1288,10 @@ function academyAdminToolbar(){
         <button class="primary-btn" onclick="addTrackV4()">+ Novo curso</button>
       </div>
       <div class="academy-admin-kpis">
-        <div><strong>${stats.courses}</strong><span>Cursos</span></div>
-        <div><strong>${stats.lessons}</strong><span>Aulas</span></div>
-        <div><strong>${stats.certificates}</strong><span>Certificados</span></div>
-        <div><strong>${stats.avg}%</strong><span>Média geral</span></div>
+        <div class="academy-admin-kpi"><small>Cursos</small><strong>${stats.courses}</strong><span>Total cadastrado</span></div>
+        <div class="academy-admin-kpi"><small>Aulas</small><strong>${stats.lessons}</strong><span>Conteúdos ativos</span></div>
+        <div class="academy-admin-kpi"><small>Certificados</small><strong>${stats.certificates}</strong><span>Emitidos</span></div>
+        <div class="academy-admin-kpi"><small>Média geral</small><strong>${stats.avg}%</strong><span>Conclusão média</span></div>
       </div>
     </section>`;
 }
@@ -1311,7 +1311,7 @@ function renderAcademy(){
     {n:stats.lessons,t:'Aulas'},
     {n:stats.certificates,t:'Certificados'},
     {n:academyRoleText(),t:'Perfil ativo'}
-  ].map(s=>`<div class="academy-stat-card"><span>${escapeHtml(String(s.n))}</span><small>${escapeHtml(s.t)}</small></div>`).join('');
+  ].map(s=>`<div class="academy-stat-card"><strong>${escapeHtml(String(s.n))}</strong><small>${escapeHtml(s.t)}</small></div>`).join('');
 
   if($('academyCertificatesText')) $('academyCertificatesText').textContent = certificates.length ? `${certificates.length} certificado(s) emitido(s).` : 'Conclua um curso para emitir seu primeiro certificado.';
   if($('academyCertificates')) $('academyCertificates').innerHTML = certificates.length ? certificates.map(c=>`<button class="certificate-line" onclick="downloadCertificate('${escapeAttr(c.trackTitle)}','${escapeAttr(c.issuedAt)}')">${escapeHtml(c.trackTitle)}<small>${escapeHtml(c.issuedAt)}</small></button>`).join('') : '<p class="muted">Sem certificados ainda.</p>';
