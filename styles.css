@@ -515,3 +515,36 @@
 /* Academia 3.0 - cursos e aulas em página completa com menu lateral */
 .course-full-page,.lesson-full-page{width:100%;max-width:1180px;margin:0 auto;padding:8px 0 40px}.course-hero-full{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;background:linear-gradient(135deg,#06183b,#053798);color:#fff;border-radius:28px;padding:30px;box-shadow:0 22px 55px rgba(5,55,152,.22);margin-bottom:18px}.course-hero-full h1{font-size:40px;line-height:1.1;margin:12px 0;color:#fff}.course-hero-full p{color:#e5eeff;line-height:1.7;max-width:760px}.course-meta-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:20px 0}.course-meta-grid span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:16px;padding:14px;color:#eaf1ff}.course-meta-grid b{display:block;color:#fff;font-size:18px}.course-progress-row{align-items:center}.course-progress-row strong{font-size:26px}.course-certificate-box{background:#fff;color:var(--text);border-radius:22px;padding:22px;box-shadow:var(--shadow);align-self:stretch}.course-certificate-box h3{color:var(--blue);margin:10px 0 6px}.course-certificate-box p{color:var(--muted);line-height:1.6}.course-layout-full{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px}.course-main-panel,.course-side-panel,.lesson-course-sidebar,.lesson-content-panel{background:#fff;border:1px solid var(--line);border-radius:24px;padding:24px;box-shadow:var(--shadow)}.course-lessons-list{display:grid;gap:12px}.course-lesson-item{width:100%;border:1px solid var(--line);background:#fff;border-radius:18px;padding:16px;text-align:left;display:grid;grid-template-columns:42px 1fr;gap:12px;align-items:center;cursor:pointer;transition:.2s}.course-lesson-item:hover,.course-lesson-item.active{border-color:var(--blue);box-shadow:0 12px 26px rgba(5,55,152,.10);transform:translateY(-1px)}.course-lesson-item span{width:42px;height:42px;border-radius:50%;background:#e8f1ff;color:var(--blue);display:grid;place-items:center;font-weight:900}.course-lesson-item.done span{background:#dcfae6;color:var(--ok)}.course-lesson-item b{display:block;color:var(--text);margin-bottom:4px}.course-lesson-item small{color:var(--muted)}.course-side-panel{position:sticky;top:24px;align-self:start}.course-side-panel hr{border:0;border-top:1px solid var(--line);margin:20px 0}.lesson-shell{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px}.lesson-course-sidebar{position:sticky;top:24px;align-self:start}.lesson-course-sidebar h3{color:var(--blue);margin-top:0}.academy-progress-bar.compact{height:9px;margin:10px 0}.compact-list{margin-top:16px}.compact-list .course-lesson-item{padding:12px;grid-template-columns:34px 1fr;border-radius:14px}.compact-list .course-lesson-item span{width:34px;height:34px}.lesson-content-panel h1{font-size:36px;line-height:1.12;margin:14px 0 10px;color:var(--blue)}.lesson-content-panel .lesson-video{width:100%;min-height:420px;border:0;border-radius:20px;background:#07142f;margin:22px 0}.lesson-materials{border-top:1px solid var(--line);margin-top:22px;padding-top:18px;display:grid;gap:10px}.lesson-materials h3{color:var(--blue);margin:0 0 6px}.lesson-materials a{display:block;text-decoration:none;border:1px solid var(--line);border-radius:14px;padding:12px 14px;color:var(--blue);font-weight:800;background:#f8fbff}.lesson-actions-bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:24px;padding-top:18px}.lesson-actions-bar button:last-child{justify-self:end}@media(max-width:1100px){.course-hero-full,.course-layout-full,.lesson-shell{grid-template-columns:1fr}.course-side-panel,.lesson-course-sidebar{position:static}.course-meta-grid{grid-template-columns:repeat(2,1fr)}.lesson-content-panel .lesson-video{min-height:320px}}@media(max-width:720px){.course-hero-full{padding:22px;border-radius:22px}.course-hero-full h1,.lesson-content-panel h1{font-size:28px}.course-meta-grid{grid-template-columns:1fr}.lesson-actions-bar{grid-template-columns:1fr}.lesson-actions-bar button,.lesson-actions-bar button:last-child{width:100%;justify-self:stretch}}
 
+/* =========================================================
+   Academia Dynamic 4.0 - LMS corporativo
+   ========================================================= */
+.academy-admin-panel{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:24px;
+  padding:22px;
+  box-shadow:var(--shadow);
+  margin:18px 0 22px;
+}
+.academy-admin-head{display:flex;justify-content:space-between;gap:18px;align-items:center}
+.academy-admin-head h3{margin:10px 0 6px;color:var(--blue);font-size:24px}
+.academy-admin-head p{margin:0;color:var(--muted);line-height:1.6}
+.academy-admin-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.academy-admin-kpis div{background:#f7faff;border:1px solid var(--line);border-radius:18px;padding:16px}
+.academy-admin-kpis strong{display:block;color:var(--blue);font-size:28px}
+.academy-admin-kpis span{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.05em}
+.track-admin-badge{position:absolute;right:14px;top:14px;background:#fff;color:var(--blue);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:900;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+.track-cover{position:relative;background-size:cover;background-position:center}
+.academy-admin-actions,.lesson-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.lesson-admin-actions{margin:6px 0 12px;padding-left:8px}
+.lesson-admin-actions button{border:0;background:#eef5ff;color:var(--blue);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer}
+.lesson-admin-actions button:last-child{background:#fee4e2;color:var(--danger)}
+.course-lesson-wrap{border-bottom:1px solid rgba(219,227,239,.8);padding-bottom:8px;margin-bottom:8px}
+.course-lesson-wrap .course-lesson-item{width:100%}
+.course-side-panel .primary-btn,.course-side-panel .ghost-btn{margin-bottom:10px}
+.compact-list .lesson-admin-actions{padding-left:0;margin-top:4px}
+.compact-list .lesson-admin-actions button{font-size:10px;padding:5px 8px}
+@media(max-width:920px){
+  .academy-admin-head{flex-direction:column;align-items:flex-start}
+  .academy-admin-kpis{grid-template-columns:repeat(2,1fr)}
+}
