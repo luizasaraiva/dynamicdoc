@@ -75,12 +75,29 @@
           </div>
           <label>Resumo</label><textarea id="articleSummary" rows="2" placeholder="Resumo do conteúdo"></textarea>
           <label>Conteúdo</label>
-          <div class="editor-toolbar">
-            <button type="button" class="small-btn" id="insertArticleImageBtn">+ Inserir imagem no conteúdo</button>
-            <input id="articleInlineImageFile" type="file" accept="image/*" class="hidden">
-            <span class="upload-help">As imagens inseridas aqui são enviadas para o Supabase Storage.</span>
+          <div class="notion-editor-shell">
+            <div class="editor-toolbar professional-editor-toolbar">
+              <button type="button" class="small-btn" data-editor-cmd="formatBlock" data-editor-value="h2">Título</button>
+              <button type="button" class="small-btn" data-editor-cmd="bold"><b>B</b></button>
+              <button type="button" class="small-btn" data-editor-cmd="italic"><i>I</i></button>
+              <button type="button" class="small-btn" data-editor-cmd="insertUnorderedList">Lista</button>
+              <button type="button" class="small-btn" data-editor-cmd="insertOrderedList">1. Lista</button>
+              <button type="button" class="small-btn" id="insertChecklistBtn">☑ Checklist</button>
+              <button type="button" class="small-btn" id="insertArticleImageBtn">Imagem</button>
+              <button type="button" class="small-btn" id="insertVideoBlockBtn">Vídeo</button>
+              <button type="button" class="small-btn" id="insertTableBlockBtn">Tabela</button>
+              <button type="button" class="small-btn" id="insertAlertBlockBtn">Alerta</button>
+              <button type="button" class="small-btn" id="insertCodeBlockBtn">Código</button>
+              <button type="button" class="small-btn" id="insertLinkBtn">Link</button>
+              <button type="button" class="small-btn" id="insertAccordionBtn">Acordeão</button>
+              <button type="button" class="small-btn" id="insertColumnsBtn">Colunas</button>
+              <button type="button" class="small-btn" id="insertGalleryBtn">Galeria</button>
+              <input id="articleInlineImageFile" type="file" accept="image/*" class="hidden">
+              <input id="articleGalleryFiles" type="file" accept="image/*" multiple class="hidden">
+            </div>
+            <div class="editor-drop-hint">Arraste imagens para o editor ou cole prints com Ctrl+V. Tudo será enviado para o Supabase Storage.</div>
+            <div id="articleContent" class="rich-editor professional-rich-editor" contenteditable="true" data-placeholder="Digite / para estruturar o artigo, cole prints ou arraste imagens..."></div>
           </div>
-          <div id="articleContent" class="rich-editor" contenteditable="true" data-placeholder="Passo a passo, orientações, regras, links..."></div>
           <div class="form-grid">
             <div><label>Tags separadas por vírgula</label><input id="articleTags" type="text" placeholder="argo, cadastro, aprovação"></div>
             <div><label>Imagem de capa (URL ou upload)</label><input id="articleImage" type="url" placeholder="https://..."><input id="articleImageFile" type="file" accept="image/*" class="file-upload-input"><small class="upload-help">Ao salvar, o upload substitui a URL manual.</small></div>
