@@ -24,6 +24,7 @@
         <button class="nav-link" data-page="systems">Sistemas</button>
         <button class="nav-link staff-only" data-page="processes">Processos internos</button>
         <button class="nav-link" data-page="academy">Academia Dynamic</button>
+        <button class="nav-link" data-page="dynamicbot">DynamicBot IA</button>
         <button class="nav-link" data-page="favorites">Favoritos</button>
         <button class="nav-link admin-only" data-page="admin">Administração</button>
       </nav>
@@ -308,6 +309,52 @@
 
       <section id="lessonView" class="page">
         <div id="academyLessonFullView"></div>
+      </section>
+
+
+
+      <section id="dynamicbot" class="page">
+        <div class="bot-hero">
+          <div>
+            <span class="pill">IA da Base DynamicDoc</span>
+            <h3>DynamicBot</h3>
+            <p>Faça perguntas e receba respostas montadas somente com os artigos cadastrados e publicados no DynamicDoc.</p>
+          </div>
+          <div class="bot-hero-card">
+            <span>🤖</span>
+            <strong>Base segura</strong>
+            <small>Responde com fontes</small>
+          </div>
+        </div>
+
+        <div class="bot-layout">
+          <section class="bot-chat-panel">
+            <div id="botMessages" class="bot-messages">
+              <div class="bot-message bot-assistant">
+                <strong>DynamicBot</strong>
+                <p>Olá! Pergunte algo sobre os artigos da base. Exemplo: <b>Como cancelar uma hospedagem no Argo?</b></p>
+              </div>
+            </div>
+            <div class="bot-input-row">
+              <input id="botQuestion" type="text" placeholder="Digite sua pergunta sobre a base de conhecimento...">
+              <button class="primary-btn" id="askBotBtn">Perguntar</button>
+            </div>
+            <p class="bot-disclaimer">O DynamicBot usa apenas conteúdos encontrados nos artigos publicados. Quando não encontrar base suficiente, ele avisa.</p>
+          </section>
+
+          <aside class="bot-side-panel">
+            <h3>Fontes encontradas</h3>
+            <div id="botSources" class="bot-sources">
+              <p class="muted">As fontes aparecerão aqui após a pergunta.</p>
+            </div>
+            <h3>Perguntas rápidas</h3>
+            <div class="bot-suggestions">
+              <button onclick="askBotSuggestion('Como cadastrar usuário no Argo?')">Cadastro no Argo</button>
+              <button onclick="askBotSuggestion('Qual a diferença entre solicitação, reserva e emissão?')">Solicitação x reserva x emissão</button>
+              <button onclick="askBotSuggestion('Como consultar histórico de viagens?')">Histórico de viagens</button>
+            </div>
+          </aside>
+        </div>
       </section>
 
       <section id="favorites" class="page"><div class="section-heading"><h3>Favoritos e histórico</h3><p>Conteúdos salvos e acessados recentemente.</p></div><div class="split"><div class="panel"><h3>Favoritos</h3><div id="favoritesList"></div></div><div class="panel"><h3>Histórico</h3><div id="historyList"></div></div></div></section>
