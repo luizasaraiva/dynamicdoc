@@ -58,6 +58,7 @@ for (const k of Object.keys(initialData)) db[k] = db[k] || initialData[k];
 let currentUser = JSON.parse(localStorage.getItem('dynamicdoc-product-user') || 'null');
 let selectedArticleId = null;
 let editorReturnPage = 'articles';
+let articleReturnPage = 'articles';
 const saveDb = () => localStorage.setItem('dynamicdoc-product-db', JSON.stringify(db));
 const saveUser = () => currentUser ? localStorage.setItem('dynamicdoc-product-user', JSON.stringify(currentUser)) : localStorage.removeItem('dynamicdoc-product-user');
 
@@ -180,7 +181,7 @@ function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));
   $(page)?.classList.add('active-page');
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
-  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo'};
+  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo',articleView:'Artigo aberto'};
   $('pageTitle').textContent = titles[page] || 'DynamicDoc';
   renderAll(); window.scrollTo(0,0);
 }
@@ -279,12 +280,75 @@ function articleCard(a){
   return `<article class="article-card"><div><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span><span class="badge">${sys}</span><span class="badge">${mod}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h3>${a.title}</h3><p>${a.summary||''}</p><div class="badge-row">${(a.tags||[]).map(t=>`<span class="badge">#${t}</span>`).join('')}</div></div><div class="article-actions"><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button><button class="small-btn" onclick="toggleFavorite('${a.id}')">${db.favorites.includes(a.id)?'★':'☆'}</button>${canManageContent()?`<button class="small-btn" onclick="editArticle('${a.id}')">Editar</button>`:''}${isAdmin()?`<button class="small-btn small-danger" onclick="deleteArticle('${a.id}')">Excluir</button>`:''}</div></article>`;
 }
 
+function articleContentHtml(a){
+  const raw = a.content || '';
+  if (/<[a-z][\s\S]*>/i.test(raw)) return raw;
+  return raw.split('\n').filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
+}
+
+function articleReadingMinutes(a){
+  const text = String(a.content || '').replace(/<[^>]*>/g,' ').trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  return Math.max(1, Math.ceil(words / 180));
+}
+
+function articleToc(html){
+  const headings = [...html.matchAll(/<h([2-3])[^>]*>(.*?)<\/h\1>/gi)];
+  if(!headings.length) return '';
+  return `<aside class="article-toc"><strong>Neste artigo</strong>${headings.map((m,i)=>`<a href="#topico-${i+1}">${m[2].replace(/<[^>]*>/g,'')}</a>`).join('')}</aside>`;
+}
+
+function addHeadingAnchors(html){
+  let i = 0;
+  return html.replace(/<h([2-3])([^>]*)>(.*?)<\/h\1>/gi, (all,level,attrs,text)=>{
+    i += 1;
+    return `<h${level}${attrs} id="topico-${i}">${text}</h${level}>`;
+  });
+}
+
+function currentPageId(){
+  return document.querySelector('.page.active-page')?.id || 'articles';
+}
+
 function openArticle(id){
   const a=db.articles.find(x=>x.id===id); if(!a) return;
+  const fromPage = currentPageId();
+  if(fromPage !== 'articleView') articleReturnPage = ['home','articles','systems','processes','favorites'].includes(fromPage) ? fromPage : ((a.kind==='process')?'processes':'articles');
   a.views=(a.views||0)+1; db.history=[id,...db.history.filter(x=>x!==id)].slice(0,12); saveDb(); upsert(ARTICLE_TABLE, a);
-  $('articleModalBody').innerHTML = `<div class="modal-body"><div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div><h1>${a.title}</h1><p class="muted">${a.summary||''}</p>${a.image?`<img class="content-media" src="${a.image}" alt="Imagem do artigo">`:''}${a.video?`<video class="content-media" src="${a.video}" controls></video>`:''}<div class="content-text">${(a.content||'').split('\n').map(p=>`<p>${p}</p>`).join('')}</div>${a.file?`<p><a class="primary-btn" href="${a.file}" target="_blank">Abrir arquivo</a></p>`:''}${isStaff()&&a.internalNote?`<div class="comment-box"><strong>Observação interna</strong><p>${a.internalNote}</p></div>`:''}<div class="comment-box"><strong>Comentários internos</strong><div>${(a.comments||[]).map(c=>`<p><b>${c.author}</b> • ${c.date}<br>${c.text}</p>`).join('')||'<p class="muted">Nenhum comentário.</p>'}</div>${isStaff()?`<textarea id="newComment" rows="2" placeholder="Adicionar comentário interno"></textarea><button class="primary-btn" onclick="addComment('${a.id}')">Comentar</button>`:''}</div><div class="article-actions"><button class="small-btn" onclick="rateArticle('${a.id}','likes')">👍 ${a.likes||0}</button><button class="small-btn" onclick="rateArticle('${a.id}','dislikes')">👎 ${a.dislikes||0}</button></div></div>`;
-  $('articleModal').classList.remove('hidden');
+  const sys=db.systems.find(s=>s.id===a.system)?.name||a.system||'Sem sistema';
+  const mod=db.modules.find(m=>m.id===a.module)?.name||'Sem módulo';
+  const bodyHtml = addHeadingAnchors(articleContentHtml(a));
+  const toc = articleToc(bodyHtml);
+  $('articleFullView').innerHTML = `
+    <article class="article-full-page">
+      <div class="article-view-actions">
+        <button class="ghost-btn" onclick="backFromArticle()">← Voltar</button>
+        ${canManageContent()?`<button class="small-btn" onclick="editArticle('${a.id}')">Editar artigo</button>`:''}
+      </div>
+      <div class="article-breadcrumb">Início / ${escapeHtml(sys)} / ${escapeHtml(mod)} / ${escapeHtml(a.title)}</div>
+      <header class="article-full-header">
+        <div class="badge-row"><span class="badge status-${a.status}">${a.status}</span><span class="badge">v${a.version||'1.0'}</span><span class="badge">${escapeHtml(sys)}</span><span class="badge">${escapeHtml(mod)}</span>${a.visibility==='interno'?'<span class="badge">Interno</span>':''}</div>
+        <h1>${escapeHtml(a.title)}</h1>
+        <p class="article-summary">${escapeHtml(a.summary||'')}</p>
+        <div class="article-meta-row"><span>⏱ ${articleReadingMinutes(a)} min de leitura</span><span>👁 ${a.views||0} visualizações</span><span>Atualizado em ${escapeHtml(a.updatedAt||a.createdAt||'')}</span></div>
+      </header>
+      <div class="article-reader-layout ${toc?'with-toc':''}">
+        <div class="article-main-column">
+          ${a.image?`<img class="content-media article-cover" src="${escapeAttr(a.image)}" alt="Imagem do artigo">`:''}
+          ${a.video?`<video class="content-media article-video" src="${escapeAttr(a.video)}" controls></video>`:''}
+          <div class="content-text article-content">${bodyHtml || '<p class="muted">Este artigo ainda não possui conteúdo.</p>'}</div>
+          ${a.file?`<p><a class="primary-btn" href="${escapeAttr(a.file)}" target="_blank">Abrir arquivo/anexo</a></p>`:''}
+          ${isStaff()&&a.internalNote?`<div class="comment-box"><strong>Observação interna</strong><p>${escapeHtml(a.internalNote)}</p></div>`:''}
+          <div class="comment-box"><strong>Comentários internos</strong><div>${(a.comments||[]).map(c=>`<p><b>${escapeHtml(c.author)}</b> • ${escapeHtml(c.date)}<br>${escapeHtml(c.text)}</p>`).join('')||'<p class="muted">Nenhum comentário.</p>'}</div>${isStaff()?`<textarea id="newComment" rows="2" placeholder="Adicionar comentário interno"></textarea><button class="primary-btn" onclick="addComment('${a.id}')">Comentar</button>`:''}</div>
+          <div class="article-actions article-feedback"><button class="small-btn" onclick="rateArticle('${a.id}','likes')">👍 Útil ${a.likes||0}</button><button class="small-btn" onclick="rateArticle('${a.id}','dislikes')">👎 Não ajudou ${a.dislikes||0}</button></div>
+        </div>
+        ${toc}
+      </div>
+    </article>`;
+  navigate('articleView');
 }
+
+function backFromArticle(){ navigate(articleReturnPage || 'articles'); }
 function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:displayUserName(currentUser)||'Colaborador',date:nowBR(),text}); saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
 function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
 function toggleFavorite(id){db.favorites=db.favorites.includes(id)?db.favorites.filter(x=>x!==id):[id,...db.favorites]; saveDb(); renderAll();}
@@ -876,9 +940,9 @@ function bindEvents(){
   });
   $('versionSearch')?.addEventListener('input', renderAdmin);
   $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
-  $('articleSystem').addEventListener('change',updateModuleOptions); $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
+  $('articleSystem').addEventListener('change',updateModuleOptions); if($('closeArticleModal')) $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); if($('articleModal')) $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
 }
 
-window.openArticle=openArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
+window.openArticle=openArticle; window.backFromArticle=backFromArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
 (async function init(){ await syncFromSupabase(); bindEvents(); renderAll(); })();
