@@ -296,12 +296,12 @@ function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));
   $(page)?.classList.add('active-page');
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
-  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo',articleView:'Artigo aberto',courseView:'Curso aberto',lessonView:'Aula aberta'};
+  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',dynamicbot:'DynamicBot IA',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo',articleView:'Artigo aberto',courseView:'Curso aberto',lessonView:'Aula aberta'};
   $('pageTitle').textContent = titles[page] || 'DynamicDoc';
   renderAll(); window.scrollTo(0,0);
 }
 
-function renderAll(){applyAccess(); populateSelects(); renderDashboard(); renderCards(); renderArticles(); renderProcesses(); renderFavorites(); renderAcademy(); renderAdmin();}
+function renderAll(){applyAccess(); populateSelects(); renderDashboard(); renderCards(); renderArticles(); renderProcesses(); renderDynamicBot(); renderFavorites(); renderAcademy(); renderAdmin();}
 function populateSelects(){
   const sysOpts = ['<option value="">Todos os sistemas</option>', ...db.systems.map(s=>`<option value="${s.id}">${s.name}</option>`)].join('');
   ['filterSystem','processSystem'].forEach(id=>$(id) && ($(id).innerHTML=sysOpts));
@@ -567,6 +567,114 @@ async function saveArticle(){
 }
 function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsert(ARTICLE_TABLE, copy); navigate(editorReturnPage); }
 function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote(ARTICLE_TABLE, id); renderAll(); }
+
+
+function textFromHtml(html=''){
+  const div=document.createElement('div');
+  div.innerHTML=String(html||'');
+  return (div.textContent||div.innerText||'').replace(/\s+/g,' ').trim();
+}
+
+function dynamicBotAccessibleArticles(){
+  return (db.articles||[]).filter(a=>{
+    const published = (a.status||'publicado') === 'publicado';
+    const isPublicArticle = (a.kind||'article') === 'article' && (a.visibility||'publico') !== 'interno';
+    const internalAllowed = isStaff() && ((a.visibility||'') === 'interno' || (a.kind||'') === 'process');
+    return published && (isPublicArticle || internalAllowed);
+  });
+}
+
+function dynamicBotTokens(text=''){
+  const stop = new Set('a,o,as,os,um,uma,uns,umas,de,da,do,das,dos,em,no,na,nos,nas,para,por,com,sem,sobre,que,qual,quais,como,quando,onde,e,ou,se,ao,à,às,até,isso,esse,essa,este,esta,ele,ela,eles,elas,meu,minha,seu,sua,tem,ter,fazer,abrir,consultar'.split(','));
+  return normalize(text).replace(/[^a-z0-9\s-]/g,' ').split(/\s+/).filter(w=>w.length>2 && !stop.has(w));
+}
+
+function dynamicBotRankArticles(question){
+  const qTokens = dynamicBotTokens(question);
+  return dynamicBotAccessibleArticles().map(a=>{
+    const searchable = `${a.title||''} ${a.summary||''} ${(a.tags||[]).join(' ')} ${textFromHtml(a.content||'')}`;
+    const hay = normalize(searchable);
+    let score = 0;
+    qTokens.forEach(t=>{ if(hay.includes(t)) score += 1; });
+    (a.tags||[]).forEach(t=>{ if(normalize(question).includes(normalize(t))) score += 2; });
+    if(normalize(a.title||'').split(/\s+/).some(w=>qTokens.includes(w))) score += 3;
+    return {article:a, score};
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
+}
+
+function dynamicBotBuildAnswer(question, ranked){
+  if(!ranked.length){
+    return 'Não encontrei uma resposta segura nos artigos publicados da base. Tente usar palavras-chave do sistema, módulo ou processo, ou cadastre um artigo sobre esse tema.';
+  }
+  const qTokens = dynamicBotTokens(question);
+  const snippets=[];
+  ranked.slice(0,3).forEach(({article})=>{
+    const text = textFromHtml(article.content || article.summary || '');
+    const parts = text.split(/(?<=[.!?])\s+|\n+/).map(p=>p.trim()).filter(Boolean);
+    const selected = parts.filter(p=>qTokens.some(t=>normalize(p).includes(t))).slice(0,3);
+    snippets.push(...(selected.length?selected:parts.slice(0,2)).map(p=>({text:p, article})));
+  });
+  const unique=[]; const seen=new Set();
+  snippets.forEach(s=>{ const key=normalize(s.text).slice(0,80); if(!seen.has(key)){ seen.add(key); unique.push(s); }});
+  const intro = `Encontrei base em ${ranked.length} artigo(s) publicado(s).`;
+  const steps = unique.slice(0,6).map((s,i)=>`${i+1}. ${s.text}`).join('\n');
+  const ending = 'Confira as fontes ao lado antes de repassar a orientação.';
+  return `${intro}\n\n${steps || 'O conteúdo encontrado está relacionado ao tema, mas não trouxe um passo a passo detalhado.'}\n\n${ending}`;
+}
+
+async function saveBotLog(question, answer, sources){
+  db.searchLogs = db.searchLogs || [];
+  db.searchLogs.unshift({id:uid(),type:'dynamicbot',query:question,date:nowBR(),sources:sources.map(s=>s.article?.id || s.id)});
+  db.searchLogs = db.searchLogs.slice(0,100);
+  saveDb();
+  if(supabaseDb){
+    try{ await supabaseDb.from('dynamicbot_logs').insert({question, answer, sources: sources.map(s=>s.article?.id || s.id), user_email: currentUser?.email || null}); }catch(e){ console.warn('DynamicBot log não salvo:', e.message); }
+  }
+}
+
+function renderDynamicBot(){
+  if(!$('botSources')) return;
+  const total = dynamicBotAccessibleArticles().length;
+  if(!$('botSources').dataset.touched){
+    $('botSources').innerHTML = `<p class="muted">${total} artigo(s) disponível(is) para consulta pela IA.</p>`;
+  }
+}
+
+function appendBotMessage(role, html){
+  if(!$('botMessages')) return;
+  const div=document.createElement('div');
+  div.className = `bot-message ${role==='user'?'bot-user':'bot-assistant'}`;
+  div.innerHTML = html;
+  $('botMessages').appendChild(div);
+  $('botMessages').scrollTop = $('botMessages').scrollHeight;
+}
+
+function renderBotSources(ranked){
+  if(!$('botSources')) return;
+  $('botSources').dataset.touched='1';
+  $('botSources').innerHTML = ranked.length ? ranked.map(({article,score})=>{
+    const sys = db.systems.find(s=>s.id===article.system)?.name || article.system || 'Base';
+    return `<button class="bot-source-card" onclick="openArticle('${article.id}')"><b>${escapeHtml(article.title)}</b><small>${escapeHtml(sys)} • relevância ${score}</small><p>${escapeHtml(article.summary||'')}</p></button>`;
+  }).join('') : '<p class="muted">Nenhuma fonte encontrada nos artigos publicados.</p>';
+}
+
+async function askDynamicBot(){
+  const input=$('botQuestion');
+  const question=(input?.value||'').trim();
+  if(!question) return;
+  appendBotMessage('user', `<strong>Você</strong><p>${escapeHtml(question)}</p>`);
+  if(input) input.value='';
+  const ranked=dynamicBotRankArticles(question);
+  const answer=dynamicBotBuildAnswer(question, ranked);
+  renderBotSources(ranked);
+  appendBotMessage('assistant', `<strong>DynamicBot</strong><p>${escapeHtml(answer).replace(/\n/g,'<br>')}</p>`);
+  await saveBotLog(question, answer, ranked);
+}
+
+function askBotSuggestion(question){
+  navigate('dynamicbot');
+  setTimeout(()=>{ if($('botQuestion')) $('botQuestion').value=question; askDynamicBot(); }, 50);
+}
 
 function renderFavorites(){
   const favs=db.favorites.map(id=>db.articles.find(a=>a.id===id)).filter(Boolean); const hist=db.history.map(id=>db.articles.find(a=>a.id===id)).filter(Boolean);
@@ -1370,6 +1478,8 @@ function bindEvents(){
   $('loginBtn').onclick=()=>$('loginPanel').classList.remove('hidden'); $('closeLogin').onclick=()=>$('loginPanel').classList.add('hidden'); $('logoutBtn').onclick=logout; $('confirmLogin').onclick=login;
   document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
   $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
+  if($('askBotBtn')) $('askBotBtn').onclick=askDynamicBot;
+  if($('botQuestion')) $('botQuestion').addEventListener('keydown',e=>{if(e.key==='Enter') askDynamicBot()});
   ['articleSearch','filterSystem','filterModule','filterStatus'].forEach(id=>$(id)?.addEventListener('input',renderArticles));
   ['processSearch','processSystem','processModule','processStatus'].forEach(id=>{
     $(id)?.addEventListener('input',renderProcesses);
@@ -1401,6 +1511,7 @@ function bindEvents(){
 
 window.insertChecklistBlock=insertChecklistBlock; window.insertTableBlock=insertTableBlock; window.insertAlertBlock=insertAlertBlock; window.insertCodeBlock=insertCodeBlock; window.insertAccordionBlock=insertAccordionBlock; window.insertColumnsBlock=insertColumnsBlock;
 window.closeAcademyLesson=closeAcademyLesson; window.showAcademyLesson=showAcademyLesson;
+window.askBotSuggestion=askBotSuggestion; window.askDynamicBot=askDynamicBot;
 window.openArticle=openArticle; window.backFromArticle=backFromArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
 
 /* =========================================================
