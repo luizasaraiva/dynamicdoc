@@ -13,7 +13,8 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop" aria-hidden="true"></div>
+    <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="brand-mark"><img src="https://res.cloudinary.com/dlpa0zn7h/image/upload/v1782222463/pin-d_negativo_1_1_tezunv.png" alt="DynamicDoc" onerror="this.style.display='none';this.parentElement.textContent='D'"></div>
         <div><h1>DynamicDoc</h1><p>Portal Corporativo</p></div>
@@ -23,7 +24,7 @@
         <button class="nav-link" data-page="articles">Artigos</button>
         <button class="nav-link" data-page="systems">Sistemas</button>
         <button class="nav-link staff-only" data-page="processes">Processos internos</button>
-        <button class="nav-link" data-page="academy">Academia Dynamic</button>
+        <button class="nav-link auth-only" data-page="academy">Academia Dynamic</button>
         <button class="nav-link" data-page="dynamicbot">DynamicBot IA</button>
         <button class="nav-link" data-page="favorites">Favoritos</button>
         <button class="nav-link admin-only" data-page="admin">Administração</button>
@@ -33,7 +34,8 @@
 
     <main class="main-content">
       <header class="topbar">
-        <div><span class="eyebrow">Dynamic Travel</span><h2 id="pageTitle">Base de conhecimento</h2></div>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Abrir menu">☰</button>
+        <div class="topbar-title"><span class="eyebrow">Dynamic Travel</span><h2 id="pageTitle">Base de conhecimento</h2></div>
         <div class="top-actions"><button class="ghost-btn" id="loginBtn">Entrar</button><button class="danger-btn hidden" id="logoutBtn">Sair</button></div>
       </header>
 
@@ -113,7 +115,7 @@
               </div>
               <div class="dashboard-actions-v2">
                 <button class="primary-btn" onclick="navigate('articleEditor')">+ Criar artigo</button>
-                <button class="ghost-btn" onclick="navigate('academy')">Gerenciar Academia</button>
+                <button class="ghost-btn auth-only" onclick="navigate('academy')">Gerenciar Academia</button>
                 <button class="ghost-btn" onclick="navigate('admin')">Usuários e métricas</button>
               </div>
             </section>
@@ -128,7 +130,7 @@
                   <h3>Cursos em andamento</h3>
                   <p>Continue de onde parou na Academia Dynamic.</p>
                 </div>
-                <button class="ghost-btn" onclick="navigate('academy')">Ver Academia</button>
+                <button class="ghost-btn auth-only" onclick="navigate('academy')">Ver Academia</button>
               </div>
               <div id="userCoursesProgress" class="dashboard-course-list-v2"></div>
             </section>
