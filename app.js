@@ -59,6 +59,9 @@ let currentUser = JSON.parse(localStorage.getItem('dynamicdoc-product-user') || 
 let selectedArticleId = null;
 let editorReturnPage = 'articles';
 let articleReturnPage = 'articles';
+let courseReturnPage = 'academy';
+let currentCourseId = null;
+let currentLessonId = null;
 const saveDb = () => localStorage.setItem('dynamicdoc-product-db', JSON.stringify(db));
 const saveUser = () => currentUser ? localStorage.setItem('dynamicdoc-product-user', JSON.stringify(currentUser)) : localStorage.removeItem('dynamicdoc-product-user');
 
@@ -130,7 +133,7 @@ async function syncFromSupabase(){
   try{
     // Compatível com a base antiga do DynamicDoc: artigos, modulos, profiles.
     // Se a tabela nova existir, também funciona; mas prioriza artigos para não perder os conteúdos já cadastrados.
-    const [artigosRes, articlesRes, sistemasRes, systemsRes, modulosRes, modulesRes, profilesRes, tracksRes] = await Promise.all([
+    const [artigosRes, articlesRes, sistemasRes, systemsRes, modulosRes, modulesRes, profilesRes, tracksRes, progressRes] = await Promise.all([
       fetchTable('artigos'),
       fetchTable('articles'),
       fetchTable('sistemas'),
@@ -138,7 +141,8 @@ async function syncFromSupabase(){
       fetchTable('modulos'),
       fetchTable('modules'),
       fetchTable('profiles'),
-      fetchTable('training_tracks')
+      fetchTable('training_tracks'),
+      fetchTable('training_progress')
     ]);
 
     const artigosData = artigosRes.data?.length ? artigosRes.data : articlesRes.data;
@@ -151,7 +155,8 @@ async function syncFromSupabase(){
     if(modulosData?.length) db.modules = modulosData.map(normalizeModule);
 
     if(profilesRes.data?.length) db.users = profilesRes.data.map(normalizeProfile);
-    if(tracksRes.data?.length) db.tracks = tracksRes.data.map(x=>({...x,lessons:x.lessons||[]}));
+    if(tracksRes.data?.length) db.tracks = tracksRes.data.map(normalizeTrainingTrack);
+    if(progressRes.data?.length) db.academyProgress = progressRes.data.map(normalizeTrainingProgress);
 
     saveDb();
   }catch(e){
@@ -163,6 +168,8 @@ const ARTICLE_TABLE = 'artigos';
 const MODULE_TABLE = 'modulos';
 const SYSTEM_TABLE = 'systems';
 const PROFILE_TABLE = 'profiles';
+const TRACK_TABLE = 'training_tracks';
+const PROGRESS_TABLE = 'training_progress';
 
 async function upsert(table,payload){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).upsert(payload); if(error) console.warn(error.message); }
 async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
@@ -238,7 +245,7 @@ function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active-page'));
   $(page)?.classList.add('active-page');
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
-  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo',articleView:'Artigo aberto'};
+  const titles={home:'Base de conhecimento',articles:'Artigos',systems:'Sistemas',processes:'Processos internos',academy:'Academia Dynamic',favorites:'Favoritos',admin:'Administração',articleEditor:'Editor de conteúdo',articleView:'Artigo aberto',courseView:'Curso aberto',lessonView:'Aula aberta'};
   $('pageTitle').textContent = titles[page] || 'DynamicDoc';
   renderAll(); window.scrollTo(0,0);
 }
@@ -434,10 +441,89 @@ function renderFavorites(){
   $('historyList').innerHTML=hist.map(a=>`<p><button class="small-btn" onclick="openArticle('${a.id}')">Abrir</button> ${a.title}</p>`).join('')||'<p class="muted">Nenhum histórico.</p>';
 }
 
+
+function normalizeTrainingTrack(x){
+  return {
+    id: x.id || uid(),
+    title: x.title || x.titulo || x.name || 'Trilha sem título',
+    description: x.description || x.descricao || '',
+    category: x.category || x.categoria || 'Trilha',
+    lessons: Array.isArray(x.lessons) ? x.lessons : (Array.isArray(x.aulas) ? x.aulas : []),
+    completedLessons: [],
+    certificates: [],
+    createdAt: x.createdAt || x.created_at || nowBR(),
+    updatedAt: x.updatedAt || x.updated_at || nowBR()
+  };
+}
+function normalizeTrainingProgress(x){
+  return {
+    id: x.id || `${x.user_key || x.user || 'visitante'}-${x.track_id || x.trackId || ''}`,
+    userKey: x.userKey || x.user_key || x.user || 'visitante',
+    trackId: x.trackId || x.track_id || '',
+    completedLessons: Array.isArray(x.completedLessons) ? x.completedLessons : (Array.isArray(x.completed_lessons) ? x.completed_lessons : []),
+    certificates: Array.isArray(x.certificates) ? x.certificates : [],
+    updatedAt: x.updatedAt || x.updated_at || nowBR()
+  };
+}
+function academyProgressKey(trackId, userKey=currentAcademyUserKey()){
+  return `${userKey}::${trackId}`;
+}
+function getAcademyProgress(trackId, userKey=currentAcademyUserKey()){
+  db.academyProgress = db.academyProgress || [];
+  let row = db.academyProgress.find(p => p.trackId === trackId && p.userKey === userKey);
+  if(!row){
+    row = {id: academyProgressKey(trackId, userKey), userKey, trackId, completedLessons:[], certificates:[], updatedAt: nowBR()};
+    db.academyProgress.push(row);
+  }
+  return row;
+}
+function applyAcademyProgressForCurrentUser(){
+  const userKey = currentAcademyUserKey();
+  (db.tracks || []).forEach(track => {
+    const progress = getAcademyProgress(track.id, userKey);
+    track.completedLessons = progress.completedLessons || [];
+    track.certificates = progress.certificates || [];
+  });
+}
+async function saveAcademyTrackRemote(track){
+  if(!supabaseDb || !track) return;
+  const payload = {
+    id: track.id,
+    title: track.title,
+    description: track.description || '',
+    category: track.category || 'Trilha',
+    lessons: track.lessons || [],
+    updated_at: new Date().toISOString()
+  };
+  const {error} = await supabaseDb.from(TRACK_TABLE).upsert(payload);
+  if(error) console.warn('Erro ao salvar trilha:', error.message);
+}
+async function saveAcademyProgressRemote(track){
+  if(!track) return;
+  const userKey = currentAcademyUserKey();
+  const progress = getAcademyProgress(track.id, userKey);
+  progress.completedLessons = track.completedLessons || [];
+  progress.certificates = track.certificates || [];
+  progress.updatedAt = nowBR();
+  saveDb();
+  if(!supabaseDb) return;
+  const payload = {
+    id: academyProgressKey(track.id, userKey),
+    user_key: userKey,
+    track_id: track.id,
+    completed_lessons: progress.completedLessons,
+    certificates: progress.certificates,
+    updated_at: new Date().toISOString()
+  };
+  const {error} = await supabaseDb.from(PROGRESS_TABLE).upsert(payload);
+  if(error) console.warn('Erro ao salvar progresso da Academia:', error.message);
+}
+
 function currentAcademyUserKey(){
   return (currentUser?.email || currentUser?.name || 'visitante').toLowerCase();
 }
 function normalizeAcademyTracks(){
+  db.academyProgress = db.academyProgress || [];
   db.tracks = (db.tracks || []).map(track => {
     const lessons = (track.lessons || []).map((lesson, index) => {
       if(typeof lesson === 'string'){
@@ -456,6 +542,7 @@ function normalizeAcademyTracks(){
     const certificates = Array.isArray(track.certificates) ? track.certificates : [];
     return {...track, lessons, completedLessons, certificates};
   });
+  applyAcademyProgressForCurrentUser();
 }
 function getTrackProgress(track){
   const total = (track.lessons || []).length;
@@ -559,7 +646,7 @@ function renderAcademy(){
           </div>
 
           <div class="track-actions-row">
-            <button class="primary-btn full track-action" onclick="openTrack('${t.id}')">${buttonText}</button>
+            <button class="primary-btn full track-action" onclick="openCourse('${t.id}')">${buttonText}</button>
             <button class="ghost-btn admin-only" onclick="addLesson('${t.id}')">+ Aula</button>
           </div>
           ${certificateAvailable ? `<button class="certificate-download-btn" onclick="downloadCertificate('${escapeAttr(t.title)}','${escapeAttr((t.certificates||[]).find(c=>c.user===currentAcademyUserKey())?.issuedAt || nowBR())}')">Baixar certificado</button>` : ''}
@@ -582,6 +669,161 @@ function trackIcon(title=''){
   return '🎓';
 }
 
+
+function lessonContentHtml(lesson={}){
+  const raw = lesson.content || lesson.description || 'Conteúdo da aula. Use esta área para orientar o colaborador, inserir links, vídeos e materiais de apoio.';
+  if (/<[a-z][\s\S]*>/i.test(raw)) return raw;
+  return String(raw).split('\n').filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
+}
+function lessonVideoHtml(lesson={}){
+  const url = lesson.video_url || lesson.video || '';
+  if(!url) return `<div class="lesson-placeholder">▶ Conteúdo da aula</div>`;
+  const safe = escapeAttr(url);
+  if(/youtube\.com|youtu\.be|vimeo\.com/i.test(url)) return `<iframe class="lesson-video" src="${safe}" allowfullscreen></iframe>`;
+  return `<video class="lesson-video" src="${safe}" controls></video>`;
+}
+function lessonMaterialsHtml(lesson={}){
+  const materials = [];
+  if(lesson.file || lesson.file_url) materials.push({label:'Arquivo de apoio', url:lesson.file || lesson.file_url});
+  if(lesson.pdf || lesson.pdf_url) materials.push({label:'PDF da aula', url:lesson.pdf || lesson.pdf_url});
+  if(lesson.link || lesson.link_url) materials.push({label:'Link complementar', url:lesson.link || lesson.link_url});
+  if(Array.isArray(lesson.materials)) lesson.materials.forEach((m,i)=>materials.push({label:m.label || m.title || `Material ${i+1}`, url:m.url || m.href || ''}));
+  return materials.filter(m=>m.url).length ? `<div class="lesson-materials"><h3>Materiais de apoio</h3>${materials.filter(m=>m.url).map(m=>`<a href="${escapeAttr(m.url)}" target="_blank">📎 ${escapeHtml(m.label)}</a>`).join('')}</div>` : '';
+}
+function trackDuration(track){
+  const total = (track.lessons||[]).reduce((sum,l)=>sum + (parseInt(String(l.duration||'10').match(/\d+/)?.[0] || '10',10)),0);
+  if(total >= 60) return `${Math.floor(total/60)}h${String(total%60).padStart(2,'0')}`;
+  return `${total} min`;
+}
+function academyLessonButtons(track, activeLessonId=''){
+  const lessons = track.lessons || [];
+  const completed = track.completedLessons || [];
+  return lessons.map((l,i)=>`
+    <button class="course-lesson-item ${l.id===activeLessonId?'active':''} ${completed.includes(l.id)?'done':''}" onclick="openLessonPage('${track.id}','${l.id}')">
+      <span>${completed.includes(l.id) ? '✓' : i+1}</span>
+      <div><b>${escapeHtml(l.title)}</b><small>${escapeHtml(l.type || 'Aula')} • ${escapeHtml(l.duration || '10 min')}</small></div>
+    </button>
+  `).join('') || '<p class="muted">Nenhuma aula cadastrada ainda.</p>';
+}
+function openCourse(trackId){
+  normalizeAcademyTracks();
+  const fromPage = currentPageId();
+  if(fromPage !== 'courseView' && fromPage !== 'lessonView') courseReturnPage = fromPage || 'academy';
+  currentCourseId = trackId;
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  ensureCertificate(track);
+  const progress = getTrackProgress(track);
+  const lessons = track.lessons || [];
+  const completed = track.completedLessons || [];
+  const cert = (track.certificates||[]).find(c=>c.user===currentAcademyUserKey());
+  const next = lessons.find(l=>!completed.includes(l.id)) || lessons[0];
+  $('academyCourseFullView').innerHTML = `
+    <section class="course-full-page">
+      <div class="article-view-actions">
+        <button class="ghost-btn" onclick="backToAcademy()">← Voltar para Academia</button>
+        ${canManageContent()?`<button class="small-btn" onclick="addLesson('${track.id}')">+ Nova aula</button>`:''}
+      </div>
+      <div class="article-breadcrumb">Início / Academia / ${escapeHtml(track.title)}</div>
+      <div class="course-hero-full">
+        <div>
+          <span class="pill">${escapeHtml(track.category || 'Curso')}</span>
+          <h1>${escapeHtml(track.title)}</h1>
+          <p>${escapeHtml(track.description || 'Trilha de aprendizagem Dynamic.')}</p>
+          <div class="course-meta-grid">
+            <span><b>${lessons.length}</b> aulas</span>
+            <span><b>${trackDuration(track)}</b> duração</span>
+            <span><b>${completed.length}/${lessons.length}</b> concluídas</span>
+            <span><b>Certificado</b> ao concluir</span>
+          </div>
+          <div class="academy-progress-row course-progress-row"><strong>${progress}%</strong><div class="academy-progress-bar"><div style="width:${progress}%"></div></div></div>
+        </div>
+        <aside class="course-certificate-box">
+          <span class="certificate-icon">🏆</span>
+          <h3>${progress >= 100 ? 'Curso concluído' : 'Certificado bloqueado'}</h3>
+          <p>${progress >= 100 ? 'Seu certificado já está disponível.' : 'Conclua todas as aulas para liberar o certificado.'}</p>
+          ${progress >= 100 ? `<button class="primary-btn full" onclick="downloadCertificate('${escapeAttr(track.title)}','${escapeAttr(cert?.issuedAt || nowBR())}')">Baixar certificado</button>` : `<button class="ghost-btn full" onclick="openLessonPage('${track.id}','${next?.id||''}')">Continuar curso</button>`}
+        </aside>
+      </div>
+      <div class="course-layout-full">
+        <main class="course-main-panel">
+          <div class="academy-section-top"><div><h3>Conteúdo do curso</h3><p>Acompanhe a sequência das aulas e seu progresso.</p></div></div>
+          <div class="course-lessons-list">${academyLessonButtons(track)}</div>
+        </main>
+        <aside class="course-side-panel">
+          <h3>Próxima aula</h3>
+          ${next ? `<p>${escapeHtml(next.title)}</p><button class="primary-btn full" onclick="openLessonPage('${track.id}','${next.id}')">${progress > 0 ? 'Continuar' : 'Começar'}</button>` : '<p class="muted">Cadastre aulas para iniciar.</p>'}
+          <hr>
+          <h3>Resumo</h3>
+          <p>${progress}% concluído</p>
+          <p>${lessons.length} aulas • ${trackDuration(track)}</p>
+        </aside>
+      </div>
+    </section>`;
+  navigate('courseView');
+}
+function backToAcademy(){ navigate(courseReturnPage || 'academy'); }
+function backToCourse(){ if(currentCourseId) openCourse(currentCourseId); else navigate('academy'); }
+function openLessonPage(trackId, lessonId){
+  normalizeAcademyTracks();
+  currentCourseId = trackId;
+  currentLessonId = lessonId;
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  const lessons = track.lessons || [];
+  const lesson = lessons.find(l=>l.id===lessonId) || lessons[0];
+  if(!lesson){ openCourse(trackId); return; }
+  const completed = track.completedLessons || [];
+  const progress = getTrackProgress(track);
+  const idx = lessons.findIndex(l=>l.id===lesson.id);
+  const prev = lessons[idx-1];
+  const next = lessons[idx+1];
+  $('academyLessonFullView').innerHTML = `
+    <section class="lesson-full-page">
+      <div class="article-view-actions">
+        <button class="ghost-btn" onclick="backToCourse()">← Voltar para trilha</button>
+        ${canManageContent()?`<button class="small-btn" onclick="addLesson('${track.id}')">+ Nova aula</button>`:''}
+      </div>
+      <div class="article-breadcrumb">Início / Academia / ${escapeHtml(track.title)} / ${escapeHtml(lesson.title)}</div>
+      <div class="lesson-shell">
+        <aside class="lesson-course-sidebar">
+          <h3>${escapeHtml(track.title)}</h3>
+          <div class="academy-progress-bar compact"><div style="width:${progress}%"></div></div>
+          <small>${progress}% concluído</small>
+          <div class="course-lessons-list compact-list">${academyLessonButtons(track, lesson.id)}</div>
+        </aside>
+        <main class="lesson-content-panel">
+          <span class="badge">${escapeHtml(lesson.type || 'Aula')}</span>
+          <h1>${escapeHtml(lesson.title)}</h1>
+          <p class="article-summary">${escapeHtml(lesson.summary || lesson.subtitle || 'Aula da Academia Dynamic.')}</p>
+          ${lessonVideoHtml(lesson)}
+          <div class="content-text article-content">${lessonContentHtml(lesson)}</div>
+          ${lesson.image || lesson.image_url ? `<img class="content-media article-cover" src="${escapeAttr(lesson.image || lesson.image_url)}" alt="Imagem da aula">` : ''}
+          ${lessonMaterialsHtml(lesson)}
+          <div class="lesson-actions-bar">
+            ${prev ? `<button class="ghost-btn" onclick="openLessonPage('${track.id}','${prev.id}')">← Aula anterior</button>` : '<span></span>'}
+            <button class="primary-btn" onclick="completeLessonAndContinue('${track.id}','${lesson.id}')">${completed.includes(lesson.id) ? 'Concluída ✓' : 'Concluir aula'}</button>
+            ${next ? `<button class="ghost-btn" onclick="openLessonPage('${track.id}','${next.id}')">Próxima aula →</button>` : `<button class="ghost-btn" onclick="openCourse('${track.id}')">Finalizar trilha</button>`}
+          </div>
+        </main>
+      </div>
+    </section>`;
+  navigate('lessonView');
+}
+function completeLessonAndContinue(trackId, lessonId){
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  track.completedLessons = track.completedLessons || [];
+  if(!track.completedLessons.includes(lessonId)) track.completedLessons.push(lessonId);
+  ensureCertificate(track);
+  saveDb();
+  saveAcademyProgressRemote(track);
+  const lessons = track.lessons || [];
+  const idx = lessons.findIndex(l=>l.id===lessonId);
+  const next = lessons[idx+1];
+  if(next) openLessonPage(trackId, next.id); else openCourse(trackId);
+}
+
 function toggleLesson(trackId, lessonId, checked){
   normalizeAcademyTracks();
   const track = db.tracks.find(t=>t.id===trackId);
@@ -591,16 +833,13 @@ function toggleLesson(trackId, lessonId, checked){
   if(!checked) track.completedLessons = track.completedLessons.filter(id=>id!==lessonId);
   ensureCertificate(track);
   saveDb();
+  saveAcademyProgressRemote(track);
   renderAcademy();
 }
-function openTrack(trackId){
-  normalizeAcademyTracks();
-  const track = db.tracks.find(t=>t.id===trackId);
-  if(!track) return;
-  const next = (track.lessons || []).find(l=>!(track.completedLessons||[]).includes(l.id)) || (track.lessons||[])[0];
-  if(next) toggleLesson(trackId, next.id, true);
-}
-function updateTrack(id){openTrack(id);}
+function openTrack(trackId){ openCourse(trackId); }
+function showAcademyLesson(trackId, lessonId){ openLessonPage(trackId, lessonId); }
+function closeAcademyLesson(){ $('academyLessonModal')?.classList.add('hidden'); }
+function updateTrack(id){openCourse(id);}
 function addLesson(trackId){
   const track = db.tracks.find(t=>t.id===trackId);
   if(!track) return;
@@ -608,21 +847,26 @@ function addLesson(trackId){
   if(!title) return;
   const duration = prompt('Duração da aula:', '10 min') || '10 min';
   const type = prompt('Tipo de aula:', 'Aula') || 'Aula';
+  const video_url = prompt('URL do vídeo da aula (opcional):', '') || '';
+  const content = prompt('Descrição/conteúdo inicial da aula:', 'Conteúdo da aula.') || 'Conteúdo da aula.';
   track.lessons = track.lessons || [];
-  track.lessons.push({id:uid(), title, duration, type});
+  track.lessons.push({id:uid(), title, duration, type, video_url, content});
   saveDb();
+  saveAcademyTrackRemote(track);
   renderAcademy();
 }
 function addTrack(){
   const title=prompt('Nome da trilha:');
   if(!title) return;
   const description=prompt('Descrição da trilha:', 'Nova trilha de aprendizagem.') || 'Nova trilha de aprendizagem.';
-  db.tracks.unshift({id:uid(),title,description,category:'Nova trilha',lessons:[
+  const track = {id:uid(),title,description,category:'Nova trilha',lessons:[
     {id:uid(),title:'Introdução',duration:'08 min',type:'Aula'},
     {id:uid(),title:'Conteúdo principal',duration:'15 min',type:'Vídeo'},
     {id:uid(),title:'Revisão final',duration:'10 min',type:'Avaliação'}
-  ],completedLessons:[],certificates:[]});
+  ],completedLessons:[],certificates:[]};
+  db.tracks.unshift(track);
   saveDb();
+  saveAcademyTrackRemote(track);
   renderAcademy();
 }
 function certificateCode(trackTitle, issuedAt){
@@ -1009,5 +1253,6 @@ function bindEvents(){
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
 }
 
+window.closeAcademyLesson=closeAcademyLesson; window.showAcademyLesson=showAcademyLesson;
 window.openArticle=openArticle; window.backFromArticle=backFromArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
 (async function init(){ await syncFromSupabase(); bindEvents(); renderAll(); })();
