@@ -65,6 +65,8 @@ const saveUser = () => currentUser ? localStorage.setItem('dynamicdoc-product-us
 const supabaseSettings = window.DynamicDocSupabase || {};
 const supabaseReady = Boolean(window.supabase && supabaseSettings.url && supabaseSettings.anonKey && !supabaseSettings.url.includes('SEU-PROJETO'));
 const supabaseDb = supabaseReady ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey) : null;
+const STORAGE_BUCKET = supabaseSettings.storageBucket || 'dynamicdoc-files';
+
 
 const isStaff = () => ['colaborador','gestor','admin'].includes(currentUser?.role);
 const canManageContent = () => ['gestor','admin'].includes(currentUser?.role);
@@ -164,6 +166,61 @@ const PROFILE_TABLE = 'profiles';
 
 async function upsert(table,payload){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).upsert(payload); if(error) console.warn(error.message); }
 async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
+
+function safeFileName(name='arquivo'){
+  const clean = String(name).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'-').replace(/-+/g,'-');
+  return clean || 'arquivo';
+}
+
+async function uploadToSupabaseStorage(file, folder='articles'){
+  if(!file) return '';
+  if(!supabaseDb){
+    alert('Supabase não configurado. Configure o supabase-config.js e o bucket dynamicdoc-files.');
+    return '';
+  }
+  const ext = (file.name || '').split('.').pop() || (file.type?.split('/')[1] || 'bin');
+  const path = `${folder}/${new Date().toISOString().slice(0,10)}/${uid()}-${safeFileName(file.name || `arquivo.${ext}`)}`;
+  const { error } = await supabaseDb.storage.from(STORAGE_BUCKET).upload(path, file, { upsert:false, cacheControl:'3600' });
+  if(error){
+    console.error('Erro no upload:', error.message);
+    alert('Erro ao enviar arquivo para o Supabase Storage: ' + error.message + '\n\nConfira se o bucket "' + STORAGE_BUCKET + '" existe e está público.');
+    return '';
+  }
+  const { data } = supabaseDb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+  return data?.publicUrl || '';
+}
+
+async function uploadFileInput(inputId, folder){
+  const input = $(inputId);
+  const file = input?.files?.[0];
+  if(!file) return '';
+  return await uploadToSupabaseStorage(file, folder);
+}
+
+async function convertEditorImagesToStorage(){
+  const editor = $('articleContent');
+  if(!editor) return;
+  const images = [...editor.querySelectorAll('img')];
+  for(const img of images){
+    const src = img.getAttribute('src') || '';
+    if(!src.startsWith('data:')) continue;
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const ext = (blob.type || 'image/png').split('/')[1] || 'png';
+    const file = new File([blob], `imagem-artigo.${ext}`, {type: blob.type || 'image/png'});
+    const publicUrl = await uploadToSupabaseStorage(file, 'articles/embedded-images');
+    if(publicUrl) img.setAttribute('src', publicUrl);
+  }
+}
+
+async function insertImageInEditorFromFile(file){
+  if(!file) return;
+  const publicUrl = await uploadToSupabaseStorage(file, 'articles/embedded-images');
+  if(!publicUrl) return;
+  $('articleContent').focus();
+  document.execCommand('insertHTML', false, `<img src="${escapeAttr(publicUrl)}" alt="Imagem do artigo">`);
+}
+
 
 function applyAccess(){
   $('currentUserName').textContent = currentUser ? displayUserName(currentUser) : 'Visitante';
@@ -356,14 +413,17 @@ function toggleFavorite(id){db.favorites=db.favorites.includes(id)?db.favorites.
 function newContent(kind='article'){ if(!canManageContent()) return alert('Apenas gestores de conteúdo e administradores podem criar.'); selectedArticleId=null; editorReturnPage=kind==='process'?'processes':'articles'; clearEditor(kind); navigate('articleEditor'); }
 function clearEditor(kind){ $('articleId').value=''; $('formKind').value=kind; $('articleEditorTitle').textContent=kind==='process'?'Novo processo interno':'Novo artigo'; ['articleTitle','articleSummary','articleTags','articleImage','articleVideo','articleFile','articleInternalNote'].forEach(id=>$(id).value=''); $('articleContent').innerHTML=''; $('articleStatus').value='rascunho'; $('articleVisibility').value=kind==='process'?'interno':'publico'; populateSelects(); }
 function editArticle(id){ const a=db.articles.find(x=>x.id===id); if(!a) return; selectedArticleId=id; editorReturnPage=(a.kind==='process')?'processes':'articles'; navigate('articleEditor'); $('articleId').value=a.id; $('formKind').value=a.kind||'article'; $('articleEditorTitle').textContent='Editar conteúdo'; $('articleTitle').value=a.title||''; $('articleStatus').value=a.status||'rascunho'; $('articleSystem').value=a.system||db.systems[0]?.id; updateModuleOptions(); $('articleModule').value=a.module||''; $('articleDepartment').value=a.department||db.departments[0]?.id; $('articleVisibility').value=a.visibility||'publico'; $('articleSummary').value=a.summary||''; $('articleContent').innerHTML=a.content||''; $('articleTags').value=(a.tags||[]).join(', '); $('articleImage').value=a.image||''; $('articleVideo').value=a.video||''; $('articleFile').value=a.file||''; $('articleInternalNote').value=a.internalNote||''; }
-function saveArticle(){
+async function saveArticle(){
   if(!canManageContent()) return alert('Sem permissão.');
   const id=$('articleId').value||uid(); const old=db.articles.find(a=>a.id===id); const base=old||{id,views:0,likes:0,dislikes:0,comments:[],versions:[],createdAt:nowBR()};
   if(old){ base.versions=base.versions||[]; base.versions.push({version:base.version||'1.0',date:nowBR(),title:base.title,content:base.content,author:displayUserName(currentUser)||'Sistema'}); }
   const nextVersion = old ? (parseFloat(old.version||'1.0')+0.1).toFixed(1) : '1.0';
-  const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').innerHTML.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image:$('articleImage').value.trim(), video:$('articleVideo').value.trim(), file:$('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
+  const uploadedCover = await uploadFileInput('articleImageFile', 'articles/covers');
+  const uploadedFile = await uploadFileInput('articleAttachmentFile', 'articles/attachments');
+  await convertEditorImagesToStorage();
+  const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').innerHTML.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image: uploadedCover || $('articleImage').value.trim(), video:$('articleVideo').value.trim(), file: uploadedFile || $('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
   if(!article.title) return alert('Informe o título.');
-  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); upsert(ARTICLE_TABLE, article); navigate(editorReturnPage);
+  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); await upsert(ARTICLE_TABLE, article); ['articleImageFile','articleAttachmentFile'].forEach(id=>{ if($(id)) $(id).value=''; }); navigate(editorReturnPage);
 }
 function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsert(ARTICLE_TABLE, copy); navigate(editorReturnPage); }
 function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote(ARTICLE_TABLE, id); renderAll(); }
@@ -940,7 +1000,12 @@ function bindEvents(){
   });
   $('versionSearch')?.addEventListener('input', renderAdmin);
   $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
-  $('articleSystem').addEventListener('change',updateModuleOptions); if($('closeArticleModal')) $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); if($('articleModal')) $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
+  $('articleSystem').addEventListener('change',updateModuleOptions);
+  $('insertArticleImageBtn')?.addEventListener('click',()=> $('articleInlineImageFile')?.click());
+  $('articleInlineImageFile')?.addEventListener('change', async e=>{ await insertImageInEditorFromFile(e.target.files?.[0]); e.target.value=''; });
+  $('articleContent')?.addEventListener('paste', e=>{ const file=[...(e.clipboardData?.files||[])].find(f=>f.type.startsWith('image/')); if(file){ e.preventDefault(); insertImageInEditorFromFile(file); } });
+  $('articleContent')?.addEventListener('drop', e=>{ const file=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/')); if(file){ e.preventDefault(); insertImageInEditorFromFile(file); } });
+  if($('closeArticleModal')) $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); if($('articleModal')) $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
 }
 
