@@ -1485,12 +1485,36 @@ function smartSearch(){
   if(hits.length){ const answer=`<div class="ai-answer"><b>Busca inteligente DynamicDoc</b><br>Encontrei ${hits.length} conteúdo(s) relacionado(s). Melhor ponto de partida: <b>${hits[0].title}</b>. Também verifique: ${hits.map(h=>h.title).join(', ')}.</div>`; $('articlesList').insertAdjacentHTML('afterbegin',answer); }
 }
 async function login(){
-  const email=$('loginEmail').value.trim(), pass=$('loginPassword').value;
-  if(supabaseDb && email && pass){ const {error}=await supabaseDb.auth.signInWithPassword({email,password:pass}); if(error) return alert('Erro no login: '+error.message); const profile=db.users.find(u=>normalize(u.email)===normalize(email)); currentUser=profile ? {...profile} : {name:email,fullName:email,email,role:'admin',department:'suporte'}; }
-  else { const profile=db.users.find(u=>normalize(u.email)===normalize(email)); currentUser=profile ? {...profile} : {id:uid(),name:email?.split('@')[0]||'Colaborador Dynamic',fullName:email?.split('@')[0]||'Colaborador Dynamic',email:email||'demo@dynamictravel.com',role:'colaborador',department:'suporte'}; }
-  saveUser(); $('loginPanel').classList.add('hidden'); renderAll();
+  const email = $('loginEmail')?.value.trim();
+  const pass = $('loginPassword')?.value;
+
+  if(!email || !pass){
+    return alert('Informe e-mail e senha para acessar o DynamicDoc.');
+  }
+
+  if(!supabaseDb || !supabaseDb.auth){
+    return alert('Supabase não configurado. Configure o arquivo supabase-config.js para usar o login real.');
+  }
+
+  const { data, error } = await supabaseDb.auth.signInWithPassword({ email, password: pass });
+  if(error){
+    return alert('Erro no login: ' + error.message);
+  }
+
+  const profile = db.users.find(u => normalize(u.email) === normalize(email));
+  currentUser = profile ? {...profile} : {
+    id: data?.user?.id || uid(),
+    name: email.split('@')[0],
+    fullName: data?.user?.user_metadata?.full_name || data?.user?.user_metadata?.name || email.split('@')[0],
+    email,
+    role: data?.user?.user_metadata?.role || 'usuario',
+    department: data?.user?.user_metadata?.department || 'agencia'
+  };
+
+  saveUser();
+  $('loginPanel').classList.add('hidden');
+  renderAll();
 }
-function testLogin(role){currentUser={id:uid(),name:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo':'Colaborador Dynamic',fullName:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo Dynamic':'Colaborador Dynamic',email:`${role}@dynamictravel.com`,role,department:'suporte'}; saveUser(); $('loginPanel').classList.add('hidden'); renderAll();}
 function logout(){currentUser=null; saveUser(); renderAll(); navigate('home');}
 
 
@@ -1506,11 +1530,9 @@ function toggleMobileSidebar(){
 
 function bindEvents(){
   document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
-  $('mobileMenuBtn')?.addEventListener('click', toggleMobileSidebar);
   $('mobileSidebarBackdrop')?.addEventListener('click', closeMobileSidebar);
   window.addEventListener('resize', ()=>{ if(window.innerWidth>1024) closeMobileSidebar(); });
   $('loginBtn').onclick=()=>$('loginPanel').classList.remove('hidden'); $('closeLogin').onclick=()=>$('loginPanel').classList.add('hidden'); $('logoutBtn').onclick=logout; $('confirmLogin').onclick=login;
-  document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
   $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
   if($('askBotBtn')) $('askBotBtn').onclick=askDynamicBot;
   if($('botQuestion')) $('botQuestion').addEventListener('keydown',e=>{if(e.key==='Enter') askDynamicBot()});
