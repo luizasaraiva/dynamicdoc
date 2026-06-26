@@ -228,6 +228,57 @@ async function insertImageInEditorFromFile(file){
   document.execCommand('insertHTML', false, `<img src="${escapeAttr(publicUrl)}" alt="Imagem do artigo">`);
 }
 
+function focusArticleEditor(){ const ed=$('articleContent'); if(ed){ ed.focus(); } }
+function insertEditorHtml(html){ focusArticleEditor(); document.execCommand('insertHTML', false, html); }
+function runEditorCommand(cmd, value=null){ focusArticleEditor(); document.execCommand(cmd, false, value); }
+function insertChecklistBlock(){ insertEditorHtml(`<ul class="dd-checklist"><li><label><input type="checkbox"> Item da checklist</label></li><li><label><input type="checkbox"> Próxima etapa</label></li></ul><p><br></p>`); }
+function insertVideoBlock(){
+  const url = prompt('Cole a URL do vídeo:'); if(!url) return;
+  const safe = escapeAttr(url.trim());
+  insertEditorHtml(`<figure class="dd-video-block"><video src="${safe}" controls></video><figcaption>Legenda do vídeo</figcaption></figure><p><br></p>`);
+}
+function insertTableBlock(){
+  insertEditorHtml(`<table class="dd-table"><thead><tr><th>Etapa</th><th>Responsável</th><th>Status</th></tr></thead><tbody><tr><td>1</td><td>Equipe</td><td>Pendente</td></tr><tr><td>2</td><td>Cliente</td><td>Em andamento</td></tr></tbody></table><p><br></p>`);
+}
+function insertAlertBlock(){
+  const type = prompt('Tipo do alerta: info, sucesso, atencao ou erro', 'info') || 'info';
+  const text = prompt('Texto do alerta:', 'Atenção: revise esta etapa antes de seguir.') || 'Atenção: revise esta etapa antes de seguir.';
+  insertEditorHtml(`<div class="dd-alert dd-alert-${escapeAttr(type)}"><strong>${escapeHtml(type.toUpperCase())}</strong><p>${escapeHtml(text)}</p></div><p><br></p>`);
+}
+function insertCodeBlock(){
+  const code = prompt('Cole o código ou comando:', 'Exemplo de código') || 'Exemplo de código';
+  insertEditorHtml(`<pre class="dd-code"><code>${escapeHtml(code)}</code></pre><p><br></p>`);
+}
+function insertLinkBlock(){
+  const url = prompt('URL do link:'); if(!url) return;
+  const label = prompt('Texto do link:', 'Abrir link') || 'Abrir link';
+  insertEditorHtml(`<a href="${escapeAttr(url)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>&nbsp;`);
+}
+function insertAccordionBlock(){
+  const title = prompt('Título do acordeão:', 'Ver detalhes') || 'Ver detalhes';
+  insertEditorHtml(`<details class="dd-accordion" open><summary>${escapeHtml(title)}</summary><p>Digite aqui o conteúdo expansível.</p></details><p><br></p>`);
+}
+function insertColumnsBlock(){
+  insertEditorHtml(`<div class="dd-columns"><div><h3>Coluna 1</h3><p>Texto da primeira coluna.</p></div><div><h3>Coluna 2</h3><p>Texto da segunda coluna.</p></div></div><p><br></p>`);
+}
+async function insertGalleryFromFiles(files){
+  files = [...(files||[])].filter(f=>f.type?.startsWith('image/'));
+  if(!files.length) return;
+  const urls=[];
+  for(const file of files){ const url = await uploadToSupabaseStorage(file, 'articles/galleries'); if(url) urls.push(url); }
+  if(!urls.length) return;
+  insertEditorHtml(`<div class="dd-gallery">${urls.map(url=>`<img src="${escapeAttr(url)}" alt="Imagem da galeria">`).join('')}</div><p><br></p>`);
+}
+function handleEditorSlashCommand(){
+  const ed=$('articleContent'); if(!ed) return;
+  const txt=(ed.textContent||'').trim().toLowerCase();
+  if(!txt.endsWith('/')) return;
+  const menu = document.createElement('div');
+  menu.className='slash-menu';
+  menu.innerHTML=`<button onclick="insertChecklistBlock(); this.closest('.slash-menu').remove()">☑ Checklist</button><button onclick="insertTableBlock(); this.closest('.slash-menu').remove()">▦ Tabela</button><button onclick="insertAlertBlock(); this.closest('.slash-menu').remove()">⚠ Alerta</button><button onclick="insertCodeBlock(); this.closest('.slash-menu').remove()">{ } Código</button><button onclick="insertAccordionBlock(); this.closest('.slash-menu').remove()">⌄ Acordeão</button><button onclick="insertColumnsBlock(); this.closest('.slash-menu').remove()">▥ Colunas</button>`;
+  ed.parentElement.appendChild(menu);
+  setTimeout(()=>{ if(menu.isConnected) menu.remove(); }, 7000);
+}
 
 function applyAccess(){
   $('currentUserName').textContent = currentUser ? displayUserName(currentUser) : 'Visitante';
@@ -1245,14 +1296,28 @@ function bindEvents(){
   $('versionSearch')?.addEventListener('input', renderAdmin);
   $('newArticleBtn').onclick=()=>newContent('article'); $('newProcessBtn').onclick=()=>newContent('process'); $('backToArticlesBtn').onclick=()=>navigate(editorReturnPage); $('saveArticleBtn').onclick=saveArticle; $('duplicateArticleBtn').onclick=duplicateArticle;
   $('articleSystem').addEventListener('change',updateModuleOptions);
+  document.querySelectorAll('[data-editor-cmd]').forEach(btn=>btn.addEventListener('click',()=>runEditorCommand(btn.dataset.editorCmd, btn.dataset.editorValue || null)));
   $('insertArticleImageBtn')?.addEventListener('click',()=> $('articleInlineImageFile')?.click());
+  $('insertChecklistBtn')?.addEventListener('click',insertChecklistBlock);
+  $('insertVideoBlockBtn')?.addEventListener('click',insertVideoBlock);
+  $('insertTableBlockBtn')?.addEventListener('click',insertTableBlock);
+  $('insertAlertBlockBtn')?.addEventListener('click',insertAlertBlock);
+  $('insertCodeBlockBtn')?.addEventListener('click',insertCodeBlock);
+  $('insertLinkBtn')?.addEventListener('click',insertLinkBlock);
+  $('insertAccordionBtn')?.addEventListener('click',insertAccordionBlock);
+  $('insertColumnsBtn')?.addEventListener('click',insertColumnsBlock);
+  $('insertGalleryBtn')?.addEventListener('click',()=> $('articleGalleryFiles')?.click());
+  $('articleGalleryFiles')?.addEventListener('change', async e=>{ await insertGalleryFromFiles(e.target.files); e.target.value=''; });
   $('articleInlineImageFile')?.addEventListener('change', async e=>{ await insertImageInEditorFromFile(e.target.files?.[0]); e.target.value=''; });
+  $('articleContent')?.addEventListener('keydown', e=>{ if(e.key==='/') setTimeout(handleEditorSlashCommand, 0); });
   $('articleContent')?.addEventListener('paste', e=>{ const file=[...(e.clipboardData?.files||[])].find(f=>f.type.startsWith('image/')); if(file){ e.preventDefault(); insertImageInEditorFromFile(file); } });
-  $('articleContent')?.addEventListener('drop', e=>{ const file=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/')); if(file){ e.preventDefault(); insertImageInEditorFromFile(file); } });
+  $('articleContent')?.addEventListener('dragover', e=>e.preventDefault());
+  $('articleContent')?.addEventListener('drop', e=>{ const files=[...(e.dataTransfer?.files||[])].filter(f=>f.type.startsWith('image/')); if(files.length){ e.preventDefault(); files.length>1 ? insertGalleryFromFiles(files) : insertImageInEditorFromFile(files[0]); } });
   if($('closeArticleModal')) $('closeArticleModal').onclick=()=>$('articleModal').classList.add('hidden'); if($('articleModal')) $('articleModal').addEventListener('click',e=>{if(e.target.id==='articleModal') $('articleModal').classList.add('hidden')});
   $('addSystemBtn').onclick=addSystem; $('addModuleBtn').onclick=addModule; $('addUserBtn').onclick=addUser; $('addTrackBtn').onclick=addTrack;
 }
 
+window.insertChecklistBlock=insertChecklistBlock; window.insertTableBlock=insertTableBlock; window.insertAlertBlock=insertAlertBlock; window.insertCodeBlock=insertCodeBlock; window.insertAccordionBlock=insertAccordionBlock; window.insertColumnsBlock=insertColumnsBlock;
 window.closeAcademyLesson=closeAcademyLesson; window.showAcademyLesson=showAcademyLesson;
 window.openArticle=openArticle; window.backFromArticle=backFromArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
 
