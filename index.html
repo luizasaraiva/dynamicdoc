@@ -48,11 +48,128 @@
       </section>
 
       <section id="home" class="page active-page">
-        <div class="hero"><div><span class="pill">Produto interno</span><h1>Conhecimento, processos, treinamento e gestão em um único portal.</h1><p>O DynamicDoc agora está estruturado como produto interno: artigos, módulos, permissões, métricas, comentários internos, versões, favoritos, histórico e Academia Dynamic.</p></div><div class="hero-card"><strong>DynamicDoc</strong><span>Conteúdo • Dados • Treinamento</span></div></div>
-        <div class="search-box"><input id="globalSearch" type="search" placeholder="Buscar por artigo, processo, sistema, módulo, tag ou dúvida..."><button class="primary-btn" id="searchBtn">Buscar</button></div>
-        <div class="dashboard-grid" id="dashboardStats"></div>
-        <div class="section-heading"><h3>Sistemas</h3><p>Categorias principais com módulos vinculados.</p></div><div class="grid cards-grid" id="systemCards"></div>
-        <div class="section-heading"><h3>Últimos conteúdos</h3><p>Artigos e processos publicados recentemente.</p></div><div class="article-list" id="recentArticles"></div>
+        <div class="dashboard-hero-v2">
+          <div>
+            <span class="pill">DynamicDoc Analytics</span>
+            <h1 id="dashboardHeroTitle">Seu centro de conhecimento, treinamento e performance.</h1>
+            <p id="dashboardHeroSubtitle">Acompanhe artigos, cursos, certificados, acessos e atualizações em uma visão moderna e simples de usar.</p>
+          </div>
+          <div class="dashboard-hero-card-v2">
+            <span id="dashboardHeroIcon">📊</span>
+            <strong id="dashboardHeroMetric">0</strong>
+            <small id="dashboardHeroLabel">indicadores ativos</small>
+          </div>
+        </div>
+
+        <div class="search-box dashboard-search-v2">
+          <input id="globalSearch" type="search" placeholder="Buscar por artigo, processo, curso, aula, sistema, módulo ou tag...">
+          <button class="primary-btn" id="searchBtn">Buscar</button>
+        </div>
+
+        <div class="dashboard-grid dashboard-kpis-v2" id="dashboardStats"></div>
+
+        <div id="adminDashboardView" class="dashboard-view-v2 hidden">
+          <div class="dashboard-main-grid-v2">
+            <section class="dashboard-panel-v2 dashboard-panel-large-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Artigos mais vistos</h3>
+                  <p>Conteúdos com maior volume de acessos na base.</p>
+                </div>
+                <button class="ghost-btn" onclick="navigate('articles')">Ver artigos</button>
+              </div>
+              <div id="topViewedArticles" class="dashboard-ranking-v2"></div>
+            </section>
+
+            <section class="dashboard-panel-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Academia</h3>
+                  <p>Cursos, progresso e certificados.</p>
+                </div>
+              </div>
+              <div id="adminAcademySummary" class="dashboard-mini-list-v2"></div>
+            </section>
+          </div>
+
+          <div class="dashboard-main-grid-v2">
+            <section class="dashboard-panel-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Últimas atualizações</h3>
+                  <p>Publicações e revisões recentes.</p>
+                </div>
+              </div>
+              <div id="recentUpdatesAdmin" class="dashboard-updates-v2"></div>
+            </section>
+
+            <section class="dashboard-panel-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Ações rápidas</h3>
+                  <p>Atalhos de administração.</p>
+                </div>
+              </div>
+              <div class="dashboard-actions-v2">
+                <button class="primary-btn" onclick="navigate('articleEditor')">+ Criar artigo</button>
+                <button class="ghost-btn" onclick="navigate('academy')">Gerenciar Academia</button>
+                <button class="ghost-btn" onclick="navigate('admin')">Usuários e métricas</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div id="userDashboardView" class="dashboard-view-v2 hidden">
+          <div class="dashboard-main-grid-v2">
+            <section class="dashboard-panel-v2 dashboard-panel-large-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Cursos em andamento</h3>
+                  <p>Continue de onde parou na Academia Dynamic.</p>
+                </div>
+                <button class="ghost-btn" onclick="navigate('academy')">Ver Academia</button>
+              </div>
+              <div id="userCoursesProgress" class="dashboard-course-list-v2"></div>
+            </section>
+
+            <section class="dashboard-panel-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Certificados</h3>
+                  <p>Conquistas disponíveis para baixar.</p>
+                </div>
+              </div>
+              <div id="userCertificatesDashboard" class="dashboard-mini-list-v2"></div>
+            </section>
+          </div>
+
+          <div class="dashboard-main-grid-v2">
+            <section class="dashboard-panel-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Últimas atualizações</h3>
+                  <p>Novos artigos e conteúdos publicados.</p>
+                </div>
+              </div>
+              <div id="recentUpdatesUser" class="dashboard-updates-v2"></div>
+            </section>
+
+            <section class="dashboard-panel-v2">
+              <div class="dashboard-panel-head-v2">
+                <div>
+                  <h3>Sistemas</h3>
+                  <p>Acesse as principais categorias.</p>
+                </div>
+              </div>
+              <div class="dashboard-systems-compact-v2" id="systemCards"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="section-heading legacy-systems-title"><h3>Sistemas</h3><p>Categorias principais com módulos vinculados.</p></div>
+        <div class="grid cards-grid legacy-systems-grid" id="legacySystemCards"></div>
+        <div class="section-heading"><h3>Últimos conteúdos</h3><p>Artigos e processos publicados recentemente.</p></div>
+        <div class="article-list" id="recentArticles"></div>
       </section>
 
       <section id="articles" class="page">
