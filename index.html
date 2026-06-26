@@ -74,8 +74,19 @@
             <div><label>Tipo</label><select id="articleVisibility"><option value="publico">Público/Cliente</option><option value="interno">Interno/Colaborador</option></select></div>
           </div>
           <label>Resumo</label><textarea id="articleSummary" rows="2" placeholder="Resumo do conteúdo"></textarea>
-          <label>Conteúdo</label><div id="articleContent" class="rich-editor" contenteditable="true" data-placeholder="Passo a passo, orientações, regras, links..."></div>
-          <div class="form-grid"><div><label>Tags separadas por vírgula</label><input id="articleTags" type="text" placeholder="argo, cadastro, aprovação"></div><div><label>Imagem (URL)</label><input id="articleImage" type="url" placeholder="https://..."></div><div><label>Vídeo (URL)</label><input id="articleVideo" type="url" placeholder="https://..."></div><div><label>Arquivo/PDF (URL)</label><input id="articleFile" type="url" placeholder="https://..."></div></div>
+          <label>Conteúdo</label>
+          <div class="editor-toolbar">
+            <button type="button" class="small-btn" id="insertArticleImageBtn">+ Inserir imagem no conteúdo</button>
+            <input id="articleInlineImageFile" type="file" accept="image/*" class="hidden">
+            <span class="upload-help">As imagens inseridas aqui são enviadas para o Supabase Storage.</span>
+          </div>
+          <div id="articleContent" class="rich-editor" contenteditable="true" data-placeholder="Passo a passo, orientações, regras, links..."></div>
+          <div class="form-grid">
+            <div><label>Tags separadas por vírgula</label><input id="articleTags" type="text" placeholder="argo, cadastro, aprovação"></div>
+            <div><label>Imagem de capa (URL ou upload)</label><input id="articleImage" type="url" placeholder="https://..."><input id="articleImageFile" type="file" accept="image/*" class="file-upload-input"><small class="upload-help">Ao salvar, o upload substitui a URL manual.</small></div>
+            <div><label>Vídeo (URL)</label><input id="articleVideo" type="url" placeholder="https://..."></div>
+            <div><label>Arquivo/PDF (URL ou upload)</label><input id="articleFile" type="url" placeholder="https://..."><input id="articleAttachmentFile" type="file" class="file-upload-input"><small class="upload-help">PDFs e anexos também ficam disponíveis em qualquer máquina.</small></div>
+          </div>
           <label>Observação interna</label><textarea id="articleInternalNote" rows="3" placeholder="Visível apenas para colaboradores"></textarea>
           <div class="editor-actions"><button class="primary-btn" id="saveArticleBtn">Salvar conteúdo</button><button class="ghost-btn" id="duplicateArticleBtn">Duplicar como nova versão</button></div>
         </div>
