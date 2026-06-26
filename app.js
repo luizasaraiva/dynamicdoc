@@ -1255,4 +1255,307 @@ function bindEvents(){
 
 window.closeAcademyLesson=closeAcademyLesson; window.showAcademyLesson=showAcademyLesson;
 window.openArticle=openArticle; window.backFromArticle=backFromArticle; window.toggleFavorite=toggleFavorite; window.editArticle=editArticle; window.deleteArticle=deleteArticle; window.addComment=addComment; window.rateArticle=rateArticle; window.updateTrack=updateTrack; window.toggleLesson=toggleLesson; window.openTrack=openTrack; window.addLesson=addLesson; window.downloadCertificate=downloadCertificate; window.removeUser=removeUser;
+
+/* =========================================================
+   DynamicDoc Academia 4.0 - LMS corporativo
+   - Admin: edição/gestão completa
+   - Usuário/agência: somente visualização, progresso e certificado
+   - Mantém menu lateral em curso e aula
+   ========================================================= */
+const academyCanManage = () => isAdmin();
+const academyRoleText = () => academyCanManage() ? 'Administrador: edição e visualização' : 'Usuário agência: visualização e progresso';
+
+function academyCourseStats(){
+  normalizeAcademyTracks();
+  const tracks = db.tracks || [];
+  const lessons = tracks.flatMap(t => t.lessons || []);
+  const certificates = tracks.flatMap(t => t.certificates || []);
+  const avg = tracks.length ? Math.round(tracks.reduce((s,t)=>s + getTrackProgress(t),0)/tracks.length) : 0;
+  return {courses:tracks.length, lessons:lessons.length, certificates:certificates.length, avg};
+}
+
+function academyAdminToolbar(){
+  if(!academyCanManage()) return '';
+  const stats = academyCourseStats();
+  return `
+    <section class="academy-admin-panel">
+      <div class="academy-admin-head">
+        <div>
+          <span class="pill">Painel administrativo</span>
+          <h3>Gestão da Academia</h3>
+          <p>Crie cursos, organize aulas, acompanhe certificados e controle o catálogo exibido para usuários da agência.</p>
+        </div>
+        <button class="primary-btn" onclick="addTrackV4()">+ Novo curso</button>
+      </div>
+      <div class="academy-admin-kpis">
+        <div><strong>${stats.courses}</strong><span>Cursos</span></div>
+        <div><strong>${stats.lessons}</strong><span>Aulas</span></div>
+        <div><strong>${stats.certificates}</strong><span>Certificados</span></div>
+        <div><strong>${stats.avg}%</strong><span>Média geral</span></div>
+      </div>
+    </section>`;
+}
+
+function renderAcademy(){
+  normalizeAcademyTracks();
+  const tracks = db.tracks || [];
+  const stats = academyCourseStats();
+  const certificates = tracks.flatMap(t => (t.certificates||[]).map(c => ({...c, trackTitle:t.title})));
+  const firstInProgress = tracks.find(t => getTrackProgress(t) > 0 && getTrackProgress(t) < 100) || tracks.find(t => getTrackProgress(t) < 100) || tracks[0];
+
+  if($('academyOverallProgress')) $('academyOverallProgress').textContent = `${stats.avg}%`;
+  if($('academyOverallBar')) $('academyOverallBar').style.width = `${stats.avg}%`;
+  if($('academyTrackCount')) $('academyTrackCount').textContent = stats.courses;
+  if($('academyStats')) $('academyStats').innerHTML = [
+    {n:stats.courses,t:'Cursos'},
+    {n:stats.lessons,t:'Aulas'},
+    {n:stats.certificates,t:'Certificados'},
+    {n:academyRoleText(),t:'Perfil ativo'}
+  ].map(s=>`<div class="academy-stat-card"><span>${escapeHtml(String(s.n))}</span><small>${escapeHtml(s.t)}</small></div>`).join('');
+
+  if($('academyCertificatesText')) $('academyCertificatesText').textContent = certificates.length ? `${certificates.length} certificado(s) emitido(s).` : 'Conclua um curso para emitir seu primeiro certificado.';
+  if($('academyCertificates')) $('academyCertificates').innerHTML = certificates.length ? certificates.map(c=>`<button class="certificate-line" onclick="downloadCertificate('${escapeAttr(c.trackTitle)}','${escapeAttr(c.issuedAt)}')">${escapeHtml(c.trackTitle)}<small>${escapeHtml(c.issuedAt)}</small></button>`).join('') : '<p class="muted">Sem certificados ainda.</p>';
+  if($('academyFeaturedLesson')){
+    const nextLesson = firstInProgress?.lessons?.find(l => !(firstInProgress.completedLessons||[]).includes(l.id)) || firstInProgress?.lessons?.[0];
+    $('academyFeaturedLesson').textContent = firstInProgress && nextLesson ? `${firstInProgress.title} • ${nextLesson.title}` : 'Selecione um curso para continuar.';
+  }
+
+  const sectionTop = document.querySelector('#academy .academy-section-top');
+  if(sectionTop){
+    sectionTop.innerHTML = `
+      <div>
+        <h3>Catálogo de cursos</h3>
+        <p>${academyCanManage() ? 'Você está vendo a visão administrativa da Academia.' : 'Cursos disponíveis para aprendizagem e certificação.'}</p>
+      </div>
+      ${academyCanManage() ? '<button class="primary-btn" onclick="addTrackV4()">+ Novo curso</button>' : ''}`;
+  }
+
+  const oldAdminPanel = document.querySelector('.academy-admin-panel');
+  if(oldAdminPanel) oldAdminPanel.remove();
+  const layout = document.querySelector('#academy .academy-layout');
+  if(layout) layout.insertAdjacentHTML('beforebegin', academyAdminToolbar());
+
+  if(!$('academyGrid')) return;
+  $('academyGrid').innerHTML = tracks.map(t=>{
+    const lessons = t.lessons || [];
+    const completed = t.completedLessons || [];
+    const progress = getTrackProgress(t);
+    const status = progress >= 100 ? 'Concluído' : progress > 0 ? 'Em andamento' : 'Não iniciado';
+    const buttonText = progress >= 100 ? 'Revisar curso' : progress > 0 ? 'Continuar curso' : 'Começar curso';
+    const next = lessons.find(l=>!completed.includes(l.id)) || lessons[0];
+    return `
+      <article class="academy-track-card ${progress>=100?'track-completed':''}">
+        <div class="track-cover" ${t.banner_url ? `style="background-image:url('${escapeAttr(t.banner_url)}')"` : ''}>
+          <span class="track-status">${escapeHtml(status)}</span>
+          ${academyCanManage()?`<span class="track-admin-badge">ADM</span>`:''}
+        </div>
+        <div class="track-body">
+          <div class="track-title-row"><h3>${escapeHtml(t.title)}</h3><span>${escapeHtml(t.category || 'Curso')}</span></div>
+          <p>${escapeHtml(t.description || 'Curso da Academia Dynamic.')}</p>
+          <div class="track-meta"><span>${lessons.length} aulas</span><span>${trackDuration(t)}</span><span>${escapeHtml(t.difficulty || 'Básico')}</span></div>
+          <div class="progress academy-track-progress"><div style="width:${progress}%"></div></div>
+          <div class="academy-progress-label">${progress}% concluído</div>
+          <div class="track-actions-row">
+            <button class="primary-btn full" onclick="openCourse('${t.id}')">${buttonText}</button>
+            ${next?`<button class="ghost-btn" onclick="openLessonPage('${t.id}','${next.id}')">Aula</button>`:''}
+          </div>
+          ${academyCanManage()?`
+            <div class="academy-admin-actions">
+              <button class="small-btn" onclick="editCourseV4('${t.id}')">✏ Editar</button>
+              <button class="small-btn" onclick="addLessonV4('${t.id}')">+ Aula</button>
+              <button class="small-btn" onclick="duplicateCourseV4('${t.id}')">Duplicar</button>
+              <button class="small-btn small-danger" onclick="deleteCourseV4('${t.id}')">Excluir</button>
+            </div>`:''}
+          ${progress>=100 ? `<button class="certificate-download-btn" onclick="downloadCertificate('${escapeAttr(t.title)}','${escapeAttr((t.certificates||[]).find(c=>c.user===currentAcademyUserKey())?.issuedAt || nowBR())}')">Baixar certificado</button>` : ''}
+        </div>
+      </article>`;
+  }).join('') || '<div class="empty-state">Nenhum curso cadastrado ainda.</div>';
+  saveDb();
+}
+
+function openCourse(trackId){
+  normalizeAcademyTracks();
+  const fromPage = currentPageId();
+  if(fromPage !== 'courseView' && fromPage !== 'lessonView') courseReturnPage = fromPage || 'academy';
+  currentCourseId = trackId;
+  const track = db.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  ensureCertificate(track);
+  const progress = getTrackProgress(track);
+  const lessons = track.lessons || [];
+  const completed = track.completedLessons || [];
+  const cert = (track.certificates||[]).find(c=>c.user===currentAcademyUserKey());
+  const next = lessons.find(l=>!completed.includes(l.id)) || lessons[0];
+  $('academyCourseFullView').innerHTML = `
+    <section class="course-full-page">
+      <div class="article-view-actions">
+        <button class="ghost-btn" onclick="backToAcademy()">← Voltar para Academia</button>
+        ${academyCanManage()?`<button class="small-btn" onclick="editCourseV4('${track.id}')">✏ Editar curso</button><button class="small-btn" onclick="addLessonV4('${track.id}')">+ Nova aula</button>`:''}
+      </div>
+      <div class="article-breadcrumb">Início / Academia / ${escapeHtml(track.title)}</div>
+      <div class="course-hero-full">
+        <div>
+          <span class="pill">${escapeHtml(track.category || 'Curso')}</span>
+          <h1>${escapeHtml(track.title)}</h1>
+          <p>${escapeHtml(track.description || 'Curso da Academia Dynamic.')}</p>
+          <div class="course-meta-grid">
+            <span><b>${lessons.length}</b> aulas</span>
+            <span><b>${trackDuration(track)}</b> duração</span>
+            <span><b>${escapeHtml(track.instructor || 'Dynamic Travel')}</b> instrutor</span>
+            <span><b>${escapeHtml(track.difficulty || 'Básico')}</b> nível</span>
+            <span><b>${completed.length}/${lessons.length}</b> concluídas</span>
+            <span><b>Certificado</b> ao concluir</span>
+          </div>
+          <div class="academy-progress-row course-progress-row"><strong>${progress}%</strong><div class="academy-progress-bar"><div style="width:${progress}%"></div></div></div>
+        </div>
+        <aside class="course-certificate-box">
+          <span class="certificate-icon">🏆</span>
+          <h3>${progress >= 100 ? 'Curso concluído' : 'Certificado bloqueado'}</h3>
+          <p>${progress >= 100 ? 'Seu certificado já está disponível.' : 'Conclua todas as aulas para liberar o certificado.'}</p>
+          ${progress >= 100 ? `<button class="primary-btn full" onclick="downloadCertificate('${escapeAttr(track.title)}','${escapeAttr(cert?.issuedAt || nowBR())}')">Baixar certificado</button>` : `<button class="ghost-btn full" onclick="openLessonPage('${track.id}','${next?.id||''}')">Continuar curso</button>`}
+        </aside>
+      </div>
+      <div class="course-layout-full">
+        <main class="course-main-panel">
+          <div class="academy-section-top"><div><h3>Conteúdo do curso</h3><p>Sequência de aulas, materiais e progresso.</p></div></div>
+          <div class="course-lessons-list">${academyLessonButtons(track)}</div>
+        </main>
+        <aside class="course-side-panel">
+          <h3>Administração</h3>
+          ${academyCanManage()?`<button class="primary-btn full" onclick="addLessonV4('${track.id}')">+ Nova aula</button><button class="ghost-btn full" onclick="editCourseV4('${track.id}')">Editar dados</button><p class="muted">Visão completa para ADM.</p>`:'<p class="muted">Você está na visão de usuário agência.</p>'}
+          <hr>
+          <h3>Próxima aula</h3>
+          ${next ? `<p>${escapeHtml(next.title)}</p><button class="primary-btn full" onclick="openLessonPage('${track.id}','${next.id}')">${progress > 0 ? 'Continuar' : 'Começar'}</button>` : '<p class="muted">Cadastre aulas para iniciar.</p>'}
+          <hr><h3>Resumo</h3><p>${progress}% concluído</p><p>${lessons.length} aulas • ${trackDuration(track)}</p>
+        </aside>
+      </div>
+    </section>`;
+  navigate('courseView');
+}
+
+function academyLessonButtons(track, activeLessonId=''){
+  const lessons = track.lessons || [];
+  const completed = track.completedLessons || [];
+  return lessons.map((l,i)=>`
+    <div class="course-lesson-wrap">
+      <button class="course-lesson-item ${l.id===activeLessonId?'active':''} ${completed.includes(l.id)?'done':''}" onclick="openLessonPage('${track.id}','${l.id}')">
+        <span>${completed.includes(l.id) ? '✓' : i+1}</span>
+        <div><b>${escapeHtml(l.title)}</b><small>${escapeHtml(l.type || 'Aula')} • ${escapeHtml(l.duration || '10 min')}</small></div>
+      </button>
+      ${academyCanManage()?`<div class="lesson-admin-actions"><button onclick="editLessonV4('${track.id}','${l.id}')">Editar</button><button onclick="deleteLessonV4('${track.id}','${l.id}')">Excluir</button></div>`:''}
+    </div>`).join('') || '<p class="muted">Nenhuma aula cadastrada ainda.</p>';
+}
+
+function openLessonPage(trackId, lessonId){
+  normalizeAcademyTracks(); currentCourseId = trackId; currentLessonId = lessonId;
+  const track = db.tracks.find(t=>t.id===trackId); if(!track) return;
+  const lessons = track.lessons || []; const lesson = lessons.find(l=>l.id===lessonId) || lessons[0];
+  if(!lesson){ openCourse(trackId); return; }
+  const completed = track.completedLessons || []; const progress = getTrackProgress(track);
+  const idx = lessons.findIndex(l=>l.id===lesson.id); const prev = lessons[idx-1]; const next = lessons[idx+1];
+  $('academyLessonFullView').innerHTML = `
+    <section class="lesson-full-page">
+      <div class="article-view-actions">
+        <button class="ghost-btn" onclick="backToCourse()">← Voltar para curso</button>
+        ${academyCanManage()?`<button class="small-btn" onclick="editLessonV4('${track.id}','${lesson.id}')">✏ Editar aula</button><button class="small-btn" onclick="addLessonV4('${track.id}')">+ Nova aula</button>`:''}
+      </div>
+      <div class="article-breadcrumb">Início / Academia / ${escapeHtml(track.title)} / ${escapeHtml(lesson.title)}</div>
+      <div class="lesson-shell">
+        <aside class="lesson-course-sidebar">
+          <h3>${escapeHtml(track.title)}</h3>
+          <div class="academy-progress-bar compact"><div style="width:${progress}%"></div></div><small>${progress}% concluído</small>
+          <div class="course-lessons-list compact-list">${academyLessonButtons(track, lesson.id)}</div>
+        </aside>
+        <main class="lesson-content-panel">
+          <span class="badge">${escapeHtml(lesson.type || 'Aula')}</span>
+          <h1>${escapeHtml(lesson.title)}</h1>
+          <p class="article-summary">${escapeHtml(lesson.summary || lesson.subtitle || 'Aula da Academia Dynamic.')}</p>
+          ${lessonVideoHtml(lesson)}
+          <div class="content-text article-content">${lessonContentHtml(lesson)}</div>
+          ${lesson.image || lesson.image_url ? `<img class="content-media article-cover" src="${escapeAttr(lesson.image || lesson.image_url)}" alt="Imagem da aula">` : ''}
+          ${lessonMaterialsHtml(lesson)}
+          ${lesson.quiz ? `<div class="lesson-materials"><h3>Quiz</h3><p>${escapeHtml(lesson.quiz)}</p></div>` : ''}
+          <div class="lesson-actions-bar">
+            ${prev ? `<button class="ghost-btn" onclick="openLessonPage('${track.id}','${prev.id}')">← Aula anterior</button>` : '<span></span>'}
+            <button class="primary-btn" onclick="completeLessonAndContinue('${track.id}','${lesson.id}')">${completed.includes(lesson.id) ? 'Concluída ✓' : 'Concluir aula'}</button>
+            ${next ? `<button class="ghost-btn" onclick="openLessonPage('${track.id}','${next.id}')">Próxima aula →</button>` : `<button class="ghost-btn" onclick="openCourse('${track.id}')">Finalizar curso</button>`}
+          </div>
+        </main>
+      </div>
+    </section>`;
+  navigate('lessonView');
+}
+
+function addTrackV4(){
+  if(!academyCanManage()) return alert('Apenas administradores podem criar cursos.');
+  const title = prompt('Nome do curso:'); if(!title) return;
+  const description = prompt('Descrição:', 'Novo curso da Academia Dynamic.') || 'Novo curso da Academia Dynamic.';
+  const category = prompt('Categoria:', 'Sistemas') || 'Sistemas';
+  const instructor = prompt('Instrutor:', 'Dynamic Travel') || 'Dynamic Travel';
+  const difficulty = prompt('Dificuldade:', 'Básico') || 'Básico';
+  const track = {id:uid(), title, description, category, instructor, difficulty, lessons:[], completedLessons:[], certificates:[], createdAt:nowBR(), updatedAt:nowBR()};
+  db.tracks.unshift(track); saveDb(); saveAcademyTrackRemote(track); renderAcademy(); openCourse(track.id);
+}
+function editCourseV4(trackId){
+  if(!academyCanManage()) return alert('Apenas administradores podem editar cursos.');
+  const t = db.tracks.find(x=>x.id===trackId); if(!t) return;
+  t.title = prompt('Nome do curso:', t.title) || t.title;
+  t.description = prompt('Descrição:', t.description || '') || t.description;
+  t.category = prompt('Categoria:', t.category || 'Sistemas') || t.category;
+  t.instructor = prompt('Instrutor:', t.instructor || 'Dynamic Travel') || t.instructor;
+  t.difficulty = prompt('Dificuldade:', t.difficulty || 'Básico') || t.difficulty;
+  t.banner_url = prompt('URL do banner/capa (opcional):', t.banner_url || '') || t.banner_url || '';
+  t.updatedAt = nowBR(); saveDb(); saveAcademyTrackRemote(t); currentPageId()==='courseView'?openCourse(trackId):renderAcademy();
+}
+function deleteCourseV4(trackId){
+  if(!academyCanManage()) return alert('Apenas administradores podem excluir cursos.');
+  if(!confirm('Excluir este curso e suas aulas?')) return;
+  db.tracks = (db.tracks||[]).filter(t=>t.id!==trackId); saveDb(); renderAcademy(); navigate('academy');
+}
+function duplicateCourseV4(trackId){
+  if(!academyCanManage()) return;
+  const t = db.tracks.find(x=>x.id===trackId); if(!t) return;
+  const copy = JSON.parse(JSON.stringify(t)); copy.id = uid(); copy.title = `${copy.title} (cópia)`; copy.lessons = (copy.lessons||[]).map(l=>({...l,id:uid()})); copy.completedLessons=[]; copy.certificates=[]; copy.createdAt=nowBR(); copy.updatedAt=nowBR();
+  db.tracks.unshift(copy); saveDb(); renderAcademy();
+}
+function addLessonV4(trackId){
+  if(!academyCanManage()) return alert('Apenas administradores podem criar aulas.');
+  const track = db.tracks.find(t=>t.id===trackId); if(!track) return;
+  const title = prompt('Nome da aula:'); if(!title) return;
+  const duration = prompt('Duração:', '10 min') || '10 min';
+  const type = prompt('Tipo:', 'Aula') || 'Aula';
+  const video_url = prompt('URL do vídeo (opcional):', '') || '';
+  const content = prompt('Conteúdo inicial:', 'Conteúdo da aula.') || 'Conteúdo da aula.';
+  track.lessons = track.lessons || []; track.lessons.push({id:uid(), title, duration, type, video_url, content, materials:[]}); track.updatedAt=nowBR();
+  saveDb(); saveAcademyTrackRemote(track); openCourse(trackId);
+}
+function editLessonV4(trackId, lessonId){
+  if(!academyCanManage()) return alert('Apenas administradores podem editar aulas.');
+  const track = db.tracks.find(t=>t.id===trackId); const lesson = track?.lessons?.find(l=>l.id===lessonId); if(!lesson) return;
+  lesson.title = prompt('Nome da aula:', lesson.title) || lesson.title;
+  lesson.duration = prompt('Duração:', lesson.duration || '10 min') || lesson.duration;
+  lesson.type = prompt('Tipo:', lesson.type || 'Aula') || lesson.type;
+  lesson.video_url = prompt('URL do vídeo:', lesson.video_url || lesson.video || '') || lesson.video_url || '';
+  lesson.image_url = prompt('URL da imagem:', lesson.image_url || lesson.image || '') || lesson.image_url || '';
+  lesson.pdf_url = prompt('URL do PDF/material:', lesson.pdf_url || lesson.pdf || lesson.file_url || '') || lesson.pdf_url || '';
+  lesson.link_url = prompt('Link complementar:', lesson.link_url || lesson.link || '') || lesson.link_url || '';
+  lesson.content = prompt('Conteúdo/descrição:', lesson.content || lesson.description || '') || lesson.content || '';
+  lesson.quiz = prompt('Quiz/pergunta opcional:', lesson.quiz || '') || lesson.quiz || '';
+  track.updatedAt=nowBR(); saveDb(); saveAcademyTrackRemote(track); currentPageId()==='lessonView'?openLessonPage(trackId,lessonId):openCourse(trackId);
+}
+function deleteLessonV4(trackId, lessonId){
+  if(!academyCanManage()) return alert('Apenas administradores podem excluir aulas.');
+  if(!confirm('Excluir esta aula?')) return;
+  const track = db.tracks.find(t=>t.id===trackId); if(!track) return;
+  track.lessons = (track.lessons||[]).filter(l=>l.id!==lessonId);
+  track.completedLessons = (track.completedLessons||[]).filter(id=>id!==lessonId);
+  track.updatedAt=nowBR(); saveDb(); saveAcademyTrackRemote(track); currentPageId()==='lessonView'?openCourse(trackId):openCourse(trackId);
+}
+
+// Mantém compatibilidade com botões antigos
+function addTrack(){ return addTrackV4(); }
+function addLesson(trackId){ return addLessonV4(trackId); }
+window.addTrackV4=addTrackV4; window.editCourseV4=editCourseV4; window.deleteCourseV4=deleteCourseV4; window.duplicateCourseV4=duplicateCourseV4;
+window.addLessonV4=addLessonV4; window.editLessonV4=editLessonV4; window.deleteLessonV4=deleteLessonV4;
+
 (async function init(){ await syncFromSupabase(); bindEvents(); renderAll(); })();
