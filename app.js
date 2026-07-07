@@ -147,8 +147,19 @@ async function syncFromSupabase(){
       fetchTable('training_progress')
     ]);
 
-    const artigosData = artigosRes.data?.length ? artigosRes.data : articlesRes.data;
-    if(artigosData?.length) db.articles = artigosData.map(normalizeArticle);
+    // Mescla artigos das duas possíveis tabelas para não sobrescrever conteúdos locais/novos
+    // quando uma tabela antiga tiver apenas parte dos registros.
+    const remoteArticles = [
+      ...(Array.isArray(articlesRes.data) ? articlesRes.data : []),
+      ...(Array.isArray(artigosRes.data) ? artigosRes.data : [])
+    ].map(normalizeArticle);
+    if(remoteArticles.length){
+      const byId = new Map();
+      [...remoteArticles, ...(db.articles || [])].forEach(article => {
+        if(article?.id) byId.set(article.id, article);
+      });
+      db.articles = [...byId.values()];
+    }
 
     const sistemasData = sistemasRes.data?.length ? sistemasRes.data : systemsRes.data;
     if(sistemasData?.length) db.systems = sistemasData.map(s=>({id:s.id, name:s.name||s.nome, description:s.description||s.descricao||''}));
@@ -166,14 +177,32 @@ async function syncFromSupabase(){
   }
 }
 
-const ARTICLE_TABLE = 'artigos';
+const ARTICLE_TABLE = 'articles';
 const MODULE_TABLE = 'modulos';
 const SYSTEM_TABLE = 'systems';
 const PROFILE_TABLE = 'profiles';
 const TRACK_TABLE = 'training_tracks';
 const PROGRESS_TABLE = 'training_progress';
 
-async function upsert(table,payload){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).upsert(payload); if(error) console.warn(error.message); }
+async function upsert(table,payload){
+  if(!supabaseDb) return false;
+  const {error}=await supabaseDb.from(table).upsert(payload);
+  if(error){ console.error(`Erro ao salvar em ${table}:`, error.message); return false; }
+  return true;
+}
+async function upsertArticle(payload){
+  if(!supabaseDb) return false;
+  // Salva na tabela oficial atual e tenta manter compatibilidade com a tabela antiga, se existir.
+  const main = await upsert('articles', payload);
+  await upsert('artigos', payload);
+  return main;
+}
+async function removeArticleRemote(id){
+  if(!supabaseDb) return false;
+  await removeRemote('articles', id);
+  await removeRemote('artigos', id);
+  return true;
+}
 async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
 
 function safeFileName(name='arquivo'){
@@ -525,7 +554,7 @@ function openArticle(id){
   const a=db.articles.find(x=>x.id===id); if(!a) return;
   const fromPage = currentPageId();
   if(fromPage !== 'articleView') articleReturnPage = ['home','articles','systems','processes','favorites'].includes(fromPage) ? fromPage : ((a.kind==='process')?'processes':'articles');
-  a.views=(a.views||0)+1; db.history=[id,...db.history.filter(x=>x!==id)].slice(0,12); saveDb(); upsert(ARTICLE_TABLE, a);
+  a.views=(a.views||0)+1; db.history=[id,...db.history.filter(x=>x!==id)].slice(0,12); saveDb(); upsertArticle(a);
   const sys=db.systems.find(s=>s.id===a.system)?.name||a.system||'Sem sistema';
   const mod=db.modules.find(m=>m.id===a.module)?.name||'Sem módulo';
   const bodyHtml = addHeadingAnchors(articleContentHtml(a));
@@ -560,8 +589,8 @@ function openArticle(id){
 }
 
 function backFromArticle(){ navigate(articleReturnPage || 'articles'); }
-function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:displayUserName(currentUser)||'Colaborador',date:nowBR(),text}); saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
-function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsert(ARTICLE_TABLE, a); openArticle(id);}
+function addComment(id){const a=db.articles.find(x=>x.id===id); const text=$('newComment').value.trim(); if(!text) return; a.comments=a.comments||[]; a.comments.push({author:displayUserName(currentUser)||'Colaborador',date:nowBR(),text}); saveDb(); upsertArticle(a); openArticle(id);}
+function rateArticle(id,field){const a=db.articles.find(x=>x.id===id); a[field]=(a[field]||0)+1; saveDb(); upsertArticle(a); openArticle(id);}
 function toggleFavorite(id){db.favorites=db.favorites.includes(id)?db.favorites.filter(x=>x!==id):[id,...db.favorites]; saveDb(); renderAll();}
 
 function newContent(kind='article'){ if(!canManageContent()) return alert('Apenas gestores de conteúdo e administradores podem criar.'); selectedArticleId=null; editorReturnPage=kind==='process'?'processes':'articles'; clearEditor(kind); navigate('articleEditor'); }
@@ -577,10 +606,18 @@ async function saveArticle(){
   await convertEditorImagesToStorage();
   const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').innerHTML.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image: uploadedCover || $('articleImage').value.trim(), video:$('articleVideo').value.trim(), file: uploadedFile || $('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
   if(!article.title) return alert('Informe o título.');
-  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); await upsert(ARTICLE_TABLE, article); ['articleImageFile','articleAttachmentFile'].forEach(id=>{ if($(id)) $(id).value=''; }); navigate(editorReturnPage);
+  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles];
+  saveDb();
+  const savedRemote = await upsertArticle(article);
+  if(!supabaseDb){
+    alert('Artigo salvo apenas neste navegador. Configure o Supabase para salvar definitivamente.');
+  }else if(!savedRemote){
+    alert('O artigo ficou salvo apenas localmente, mas não foi enviado ao Supabase. Confira se a tabela articles existe e se as políticas de insert/update estão liberadas.');
+  }
+  ['articleImageFile','articleAttachmentFile'].forEach(id=>{ if($(id)) $(id).value=''; }); navigate(editorReturnPage);
 }
-function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsert(ARTICLE_TABLE, copy); navigate(editorReturnPage); }
-function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote(ARTICLE_TABLE, id); renderAll(); }
+function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsertArticle(copy); navigate(editorReturnPage); }
+function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeArticleRemote(id); renderAll(); }
 
 
 function textFromHtml(html=''){
@@ -1485,36 +1522,12 @@ function smartSearch(){
   if(hits.length){ const answer=`<div class="ai-answer"><b>Busca inteligente DynamicDoc</b><br>Encontrei ${hits.length} conteúdo(s) relacionado(s). Melhor ponto de partida: <b>${hits[0].title}</b>. Também verifique: ${hits.map(h=>h.title).join(', ')}.</div>`; $('articlesList').insertAdjacentHTML('afterbegin',answer); }
 }
 async function login(){
-  const email = $('loginEmail')?.value.trim();
-  const pass = $('loginPassword')?.value;
-
-  if(!email || !pass){
-    return alert('Informe e-mail e senha para acessar o DynamicDoc.');
-  }
-
-  if(!supabaseDb || !supabaseDb.auth){
-    return alert('Supabase não configurado. Configure o arquivo supabase-config.js para usar o login real.');
-  }
-
-  const { data, error } = await supabaseDb.auth.signInWithPassword({ email, password: pass });
-  if(error){
-    return alert('Erro no login: ' + error.message);
-  }
-
-  const profile = db.users.find(u => normalize(u.email) === normalize(email));
-  currentUser = profile ? {...profile} : {
-    id: data?.user?.id || uid(),
-    name: email.split('@')[0],
-    fullName: data?.user?.user_metadata?.full_name || data?.user?.user_metadata?.name || email.split('@')[0],
-    email,
-    role: data?.user?.user_metadata?.role || 'usuario',
-    department: data?.user?.user_metadata?.department || 'agencia'
-  };
-
-  saveUser();
-  $('loginPanel').classList.add('hidden');
-  renderAll();
+  const email=$('loginEmail').value.trim(), pass=$('loginPassword').value;
+  if(supabaseDb && email && pass){ const {error}=await supabaseDb.auth.signInWithPassword({email,password:pass}); if(error) return alert('Erro no login: '+error.message); const profile=db.users.find(u=>normalize(u.email)===normalize(email)); currentUser=profile ? {...profile} : {name:email,fullName:email,email,role:'admin',department:'suporte'}; }
+  else { const profile=db.users.find(u=>normalize(u.email)===normalize(email)); currentUser=profile ? {...profile} : {id:uid(),name:email?.split('@')[0]||'Colaborador Dynamic',fullName:email?.split('@')[0]||'Colaborador Dynamic',email:email||'demo@dynamictravel.com',role:'colaborador',department:'suporte'}; }
+  saveUser(); $('loginPanel').classList.add('hidden'); renderAll();
 }
+function testLogin(role){currentUser={id:uid(),name:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo':'Colaborador Dynamic',fullName:role==='admin'?'Administrador Dynamic':role==='gestor'?'Gestor de Conteúdo Dynamic':'Colaborador Dynamic',email:`${role}@dynamictravel.com`,role,department:'suporte'}; saveUser(); $('loginPanel').classList.add('hidden'); renderAll();}
 function logout(){currentUser=null; saveUser(); renderAll(); navigate('home');}
 
 
@@ -1530,9 +1543,11 @@ function toggleMobileSidebar(){
 
 function bindEvents(){
   document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
+  $('mobileMenuBtn')?.addEventListener('click', toggleMobileSidebar);
   $('mobileSidebarBackdrop')?.addEventListener('click', closeMobileSidebar);
   window.addEventListener('resize', ()=>{ if(window.innerWidth>1024) closeMobileSidebar(); });
   $('loginBtn').onclick=()=>$('loginPanel').classList.remove('hidden'); $('closeLogin').onclick=()=>$('loginPanel').classList.add('hidden'); $('logoutBtn').onclick=logout; $('confirmLogin').onclick=login;
+  document.querySelectorAll('[data-test-role]').forEach(b=>b.onclick=()=>testLogin(b.dataset.testRole));
   $('searchBtn').onclick=smartSearch; $('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter') smartSearch()});
   if($('askBotBtn')) $('askBotBtn').onclick=askDynamicBot;
   if($('botQuestion')) $('botQuestion').addEventListener('keydown',e=>{if(e.key==='Enter') askDynamicBot()});
