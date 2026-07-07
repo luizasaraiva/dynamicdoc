@@ -79,6 +79,11 @@ const canAccessAcademy = () => isAuthenticated();
 const roleLabel = (role) => ({usuario:'Usuário',colaborador:'Colaborador',gestor:'Gestor de Conteúdo',admin:'Administrador'}[role] || 'Visitante');
 const normalize = (v) => (v || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const displayUserName = (user=currentUser) => user?.fullName || user?.nome_completo || user?.name || user?.nome || user?.email?.split('@')[0] || 'Participante Dynamic';
+function mergeById(...lists){
+  const map = new Map();
+  lists.flat().filter(Boolean).forEach(item => { if(item?.id) map.set(item.id, {...(map.get(item.id)||{}), ...item}); });
+  return [...map.values()];
+}
 
 async function fetchTable(table, select='*'){
   if(!supabaseDb) return {data:null,error:null};
@@ -147,25 +152,34 @@ async function syncFromSupabase(){
       fetchTable('training_progress')
     ]);
 
-    // Mescla artigos das duas possíveis tabelas para não sobrescrever conteúdos locais/novos
-    // quando uma tabela antiga tiver apenas parte dos registros.
-    const remoteArticles = [
-      ...(Array.isArray(articlesRes.data) ? articlesRes.data : []),
-      ...(Array.isArray(artigosRes.data) ? artigosRes.data : [])
-    ].map(normalizeArticle);
-    if(remoteArticles.length){
+    // Mescla as duas tabelas para o visitante enxergar TODOS os artigos.
+    // Antes o sistema priorizava `artigos`; se ela tivesse qualquer Argo, ignorava os novos Reserve salvos em `articles`.
+    const artigosData = Array.isArray(artigosRes.data) ? artigosRes.data : [];
+    const articlesData = Array.isArray(articlesRes.data) ? articlesRes.data : [];
+    const mergedArticles = [...artigosData, ...articlesData].map(normalizeArticle);
+    if(mergedArticles.length){
       const byId = new Map();
-      [...remoteArticles, ...(db.articles || [])].forEach(article => {
-        if(article?.id) byId.set(article.id, article);
+      mergedArticles.forEach(a => {
+        const previous = byId.get(a.id);
+        if(!previous){ byId.set(a.id, a); return; }
+        const previousDate = new Date(previous.updatedAt || previous.updated_at || previous.createdAt || 0).getTime();
+        const currentDate = new Date(a.updatedAt || a.updated_at || a.createdAt || 0).getTime();
+        byId.set(a.id, currentDate >= previousDate ? a : previous);
       });
       db.articles = [...byId.values()];
     }
 
-    const sistemasData = sistemasRes.data?.length ? sistemasRes.data : systemsRes.data;
-    if(sistemasData?.length) db.systems = sistemasData.map(s=>({id:s.id, name:s.name||s.nome, description:s.description||s.descricao||''}));
+    const sistemasData = [...(Array.isArray(sistemasRes.data) ? sistemasRes.data : []), ...(Array.isArray(systemsRes.data) ? systemsRes.data : [])];
+    if(sistemasData.length){
+      const remoteSystems = sistemasData.map(s=>({id:s.id, name:s.name||s.nome, description:s.description||s.descricao||''})).filter(s=>s.id);
+      db.systems = mergeById(initialData.systems, remoteSystems);
+    }
 
-    const modulosData = modulosRes.data?.length ? modulosRes.data : modulesRes.data;
-    if(modulosData?.length) db.modules = modulosData.map(normalizeModule);
+    const modulosData = [...(Array.isArray(modulosRes.data) ? modulosRes.data : []), ...(Array.isArray(modulesRes.data) ? modulesRes.data : [])];
+    if(modulosData.length){
+      const remoteModules = modulosData.map(normalizeModule).filter(m=>m.id);
+      db.modules = mergeById(initialData.modules, remoteModules);
+    }
 
     if(profilesRes.data?.length) db.users = profilesRes.data.map(normalizeProfile);
     if(tracksRes.data?.length) db.tracks = tracksRes.data.map(normalizeTrainingTrack);
@@ -184,24 +198,72 @@ const PROFILE_TABLE = 'profiles';
 const TRACK_TABLE = 'training_tracks';
 const PROGRESS_TABLE = 'training_progress';
 
+function toLegacySystem(s){ return {id:s.id, nome:s.name, descricao:s.description||''}; }
+function toLegacyModule(m){ return {id:m.id, sistema:m.system, nome:m.name}; }
+function toLegacyArticle(a){
+  return {
+    id:a.id,
+    tipo_conteudo:a.kind || 'article',
+    visibilidade:a.visibility || 'publico',
+    titulo:a.title || '',
+    resumo:a.summary || '',
+    sistema:a.system || '',
+    modulo:a.module || '',
+    departamento:a.department || '',
+    status:a.status || 'rascunho',
+    tags:Array.isArray(a.tags) ? a.tags : [],
+    conteudo:a.content || '',
+    imagem:a.image || '',
+    video:a.video || '',
+    arquivo:a.file || '',
+    observacao_interna:a.internalNote || '',
+    versao:a.version || '1.0',
+    versions:Array.isArray(a.versions) ? a.versions : [],
+    comments:Array.isArray(a.comments) ? a.comments : [],
+    visualizacoes:Number(a.views || 0),
+    likes:Number(a.likes || 0),
+    dislikes:Number(a.dislikes || 0),
+    criado_em:a.createdAt || nowBR(),
+    atualizado_em:a.updatedAt || nowBR()
+  };
+}
+
 async function upsert(table,payload){
-  if(!supabaseDb) return false;
+  if(!supabaseDb) return {ok:false, table, message:'Supabase não configurado no supabase-config.js'};
   const {error}=await supabaseDb.from(table).upsert(payload);
-  if(error){ console.error(`Erro ao salvar em ${table}:`, error.message); return false; }
-  return true;
+  if(error){
+    console.error(`Erro ao salvar em ${table}:`, error);
+    return {ok:false, table, message:error.message || 'Erro desconhecido', details:error};
+  }
+  return {ok:true, table};
 }
+
+async function ensureCoreReferenceData(){
+  if(!supabaseDb) return;
+  await Promise.allSettled([
+    ...initialData.systems.map(s=>upsert('systems', s)),
+    ...initialData.systems.map(s=>upsert('sistemas', toLegacySystem(s))),
+    ...initialData.modules.map(m=>upsert('modules', m)),
+    ...initialData.modules.map(m=>upsert('modulos', toLegacyModule(m)))
+  ]);
+}
+
 async function upsertArticle(payload){
-  if(!supabaseDb) return false;
-  // Salva na tabela oficial atual e tenta manter compatibilidade com a tabela antiga, se existir.
-  const main = await upsert('articles', payload);
-  await upsert('artigos', payload);
-  return main;
-}
-async function removeArticleRemote(id){
-  if(!supabaseDb) return false;
-  await removeRemote('articles', id);
-  await removeRemote('artigos', id);
-  return true;
+  if(!supabaseDb) return {ok:false, message:'Supabase não configurado no supabase-config.js'};
+  await ensureCoreReferenceData();
+
+  const modern = await upsert('articles', payload);
+  const legacy = await upsert('artigos', toLegacyArticle(payload));
+
+  // Sucesso se gravou em pelo menos uma tabela. O visitante lê as duas.
+  if(modern.ok || legacy.ok) return {ok:true, modern, legacy};
+
+  return {
+    ok:false,
+    message:`Não salvou no Supabase. articles: ${modern.message}. artigos: ${legacy.message}.`,
+    modern,
+    legacy
+  };
 }
 async function removeRemote(table,id){ if(!supabaseDb) return; const {error}=await supabaseDb.from(table).delete().eq('id',id); if(error) console.warn(error.message); }
 
@@ -606,18 +668,10 @@ async function saveArticle(){
   await convertEditorImagesToStorage();
   const article={...base,kind:$('formKind').value, title:$('articleTitle').value.trim(), status:$('articleStatus').value, system:$('articleSystem').value, module:$('articleModule').value, department:$('articleDepartment').value, visibility:$('articleVisibility').value, summary:$('articleSummary').value.trim(), content:$('articleContent').innerHTML.trim(), tags:$('articleTags').value.split(',').map(t=>t.trim()).filter(Boolean), image: uploadedCover || $('articleImage').value.trim(), video:$('articleVideo').value.trim(), file: uploadedFile || $('articleFile').value.trim(), internalNote:$('articleInternalNote').value.trim(), version:nextVersion, updatedAt:nowBR()};
   if(!article.title) return alert('Informe o título.');
-  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles];
-  saveDb();
-  const savedRemote = await upsertArticle(article);
-  if(!supabaseDb){
-    alert('Artigo salvo apenas neste navegador. Configure o Supabase para salvar definitivamente.');
-  }else if(!savedRemote){
-    alert('O artigo ficou salvo apenas localmente, mas não foi enviado ao Supabase. Confira se a tabela articles existe e se as políticas de insert/update estão liberadas.');
-  }
-  ['articleImageFile','articleAttachmentFile'].forEach(id=>{ if($(id)) $(id).value=''; }); navigate(editorReturnPage);
+  db.articles = old ? db.articles.map(a=>a.id===id?article:a) : [article,...db.articles]; saveDb(); const savedRemote = await upsertArticle(article); if(!savedRemote.ok){ alert('Atenção: o artigo ficou salvo apenas neste navegador, mas NÃO gravou no Supabase.\n\n' + savedRemote.message + '\n\nAbra o Console/F12 para ver o erro completo. Rode o arquivo supabase.sql atualizado no Supabase.'); } else { alert('Artigo salvo no Supabase com sucesso.'); } ['articleImageFile','articleAttachmentFile'].forEach(id=>{ if($(id)) $(id).value=''; }); navigate(editorReturnPage);
 }
 function duplicateArticle(){ const id=$('articleId').value; if(!id) return saveArticle(); const a=db.articles.find(x=>x.id===id); if(!a) return; const copy={...a,id:uid(),title:a.title+' - nova versão',version:'1.0',createdAt:nowBR(),updatedAt:nowBR(),views:0,comments:[],versions:[]}; db.articles.unshift(copy); saveDb(); upsertArticle(copy); navigate(editorReturnPage); }
-function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeArticleRemote(id); renderAll(); }
+function deleteArticle(id){ if(!confirm('Excluir este conteúdo?')) return; db.articles=db.articles.filter(a=>a.id!==id); saveDb(); removeRemote('articles', id); removeRemote('artigos', id); renderAll(); }
 
 
 function textFromHtml(html=''){
@@ -1893,4 +1947,4 @@ function addLesson(trackId){ return addLessonV4(trackId); }
 window.addTrackV4=addTrackV4; window.editCourseV4=editCourseV4; window.deleteCourseV4=deleteCourseV4; window.duplicateCourseV4=duplicateCourseV4;
 window.addLessonV4=addLessonV4; window.editLessonV4=editLessonV4; window.deleteLessonV4=deleteLessonV4;
 
-(async function init(){ await syncFromSupabase(); bindEvents(); renderAll(); })();
+(async function init(){ await ensureCoreReferenceData(); await syncFromSupabase(); bindEvents(); renderAll(); })();
